@@ -7,36 +7,29 @@ exports.register = async (req, res) => {
     const { email, name, password } = req.body;
 
     try {
-        // 1. Kiểm tra xem email đã tồn tại trong DB chưa
+        // 1. Kiểm tra trùng email (Giữ nguyên)
         const [rows] = await connection.promise().query('SELECT * FROM users WHERE email = ?', [email]);
-        if (rows.length > 0) {
-            return res.status(400).json({ message: 'Email này đã được sử dụng!' });
-        }
+        if (rows.length > 0) return res.status(400).json({ message: 'Email này đã được sử dụng!' });
 
-        // 2. Mã hóa mật khẩu
+        // 2. Mã hóa mật khẩu (Giữ nguyên)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 3. THỬ GỬI EMAIL CHÀO MỪNG
-        // Nếu email không tồn tại hoặc sai, hàm này sẽ báo lỗi và nhảy xuống catch
-        try {
-            await sendWelcomeEmail(email, name);
-        } catch (emailError) {
-            console.error("Gửi email thất bại:", emailError);
-            return res.status(400).json({ message: 'Email không hợp lệ hoặc không tồn tại!' });
-        }
-
-        // 4. Nếu gửi email thành công thì mới Lưu vào DB
+        // 3. LƯU VÀO DATABASE NGAY LẬP TỨC (Không chờ gửi mail nữa)
         await connection.promise().query(
             'INSERT INTO users (email, name, password) VALUES (?, ?, ?)', 
             [email, name, hashedPassword]
         );
 
-        res.status(201).json({ message: 'Đăng ký thành công! Hãy kiểm tra email.' });
+        // 4. Gửi mail chạy ngầm (Bỏ await)
+        // Chúng ta không cần quan tâm nó thành công hay thất bại ở đây để tránh user phải chờ
+        sendWelcomeEmail(email, name).catch(err => console.error("Lỗi gửi mail ngầm:", err));
+
+        // 5. Phản hồi ngay cho người dùng
+        res.status(201).json({ message: 'Đăng ký thành công!' });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Lỗi Server: ' + error.message });
+        res.status(500).json({ error: 'Lỗi server: ' + error.message });
     }
 };
 
