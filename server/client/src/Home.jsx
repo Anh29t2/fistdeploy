@@ -25,7 +25,7 @@ function Home({ user, onLogout }) {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/tasks?user_id=${user.id}`);
+      const response = await fetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`);
       const data = await response.json();
       setTasks(data); 
     } catch (error) { console.error("Lỗi lấy task:", error); }
@@ -37,7 +37,7 @@ function Home({ user, onLogout }) {
     e.preventDefault();
     if (!newTask.trim()) return;
     try {
-      const response = await fetch("http://localhost:3000/tasks", {
+      const response = await fetch("https://fistdeploy.onrender.com/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id, title: newTask }),
@@ -55,7 +55,7 @@ function Home({ user, onLogout }) {
     if (!deletingTask) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/tasks/${deletingTask.id}`, { method: 'DELETE' });
+      const response = await fetch(`https://fistdeploy.onrender.com/tasks/${deletingTask.id}`, { method: 'DELETE' });
       if (response.ok) {
         toast.success("Đã xóa thành công !");
         setDeletingTask(null); // Tắt popup xóa
@@ -67,7 +67,7 @@ function Home({ user, onLogout }) {
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
     try {
-      const response = await fetch(`http://localhost:3000/tasks/${editingTask.id}`, {
+      const response = await fetch(`https://fistdeploy.onrender.com/tasks/${editingTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: editingTask.title, status: editingTask.status })

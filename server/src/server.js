@@ -69,7 +69,7 @@ app.use('/auth',authRouters);
 // });
 // // === API 1: LẤY DANH SÁCH CÔNG VIỆC CỦA USER ===
 // app.get('/tasks', async (req, res) => {
-//     // Client sẽ gửi lên: http://localhost:3000/tasks?user_id=1
+//     // Client sẽ gửi lên: https://fistdeploy.onrender.com/tasks?user_id=1
 //     const { user_id } = req.query; 
 
 //     try {
