@@ -168,26 +168,21 @@ body {
 
 /* --- Style riêng cho màn hình chính (Dashboard) --- */
 .dashboard-container {
-  /* Cho phép rộng tối đa 1200px hoặc 95% màn hình */
-  width: 95%; 
-  max-width: 1200px;
-  
-  /* Căn giữa màn hình nhưng cách trên 80px */
-  margin: 100px auto 50px auto 500px auto; 
-  
-  /* Nền trắng mờ sang trọng */
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  
-  /* Bo góc và đổ bóng */
-  padding: 30px;
-  border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-  
-  /* Quan trọng: Đảm bảo nó không bị dính thuộc tính absolute của trang Login */
-  position: relative;
-  transform: none;
+    width: 95%;
+    max-width: 1200px;
+
+    /* Căn giữa full màn hình */
+    margin: 0 auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    background: rgba(255, 255, 255, 0.9);
+    padding: 30px;
+    border-radius: 20px;
 }
+
 
 /* Chỉnh lại Header một chút cho đẹp */
 .home-header h2 {
