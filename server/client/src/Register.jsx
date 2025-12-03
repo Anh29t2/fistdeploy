@@ -11,6 +11,13 @@ function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    // Kiểm tra định dạng email cơ bản bằng Regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        toast.warning("Email không đúng định dạng!");
+        return;
+    }
     
     // Kiểm tra dữ liệu
     if(!email || !name || !password) {
