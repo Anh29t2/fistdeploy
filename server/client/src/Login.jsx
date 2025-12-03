@@ -25,7 +25,7 @@ function Login({ onLoginSuccess }) {
         toast.success("🎉 Đăng nhập thành công!");
         onLoginSuccess(data.user); 
       } else {
-        toast.error("❌ " + data.message);
+        toast.error("❌ " + data.message || data.error);
       }
     } catch (error) {
       toast.error("Lỗi kết nối server!");

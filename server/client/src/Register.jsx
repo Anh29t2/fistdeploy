@@ -35,7 +35,7 @@ function Register() {
         navigate('/login'); 
       } else {
         // Hiện thông báo lỗi từ server
-        toast.error("❌ " + data.message);
+        toast.error("❌ " + data.message || data.error);
       }
     } catch (error) {
       toast.error("Lỗi kết nối server!");
