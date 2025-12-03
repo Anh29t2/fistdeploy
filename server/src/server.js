@@ -15,8 +15,29 @@ const connection = require('../config/db.js');
 
 const authRouters = require('../routes/authRoutes.js');
 const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
+const http = require('http');
+const { Server } = require("socket.io");
 app.use('/tasks', taskRoutes);
 app.use('/auth',authRouters);
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors:{
+    origin: "*",
+    methods: ["GET, POST, PUT, DELETE"]
+    }
+});
+// Lưu biến 'io' vào app để dùng được ở trong Controller
+app.set('socketio', io);
+
+// Lắng nghe khi có người kết nối (Optional - để log cho vui)
+io.on('connection', (socket) => {
+    console.log(' Có người vừa kết nối Socket: ' + socket.id);
+    
+    socket.on('disconnect', () => {
+        console.log('Người đó đã ngắt kết nối');
+    });
+});
 
 // Dang ky (API)
 // app.post('/register', async (req, res) => {
@@ -131,6 +152,6 @@ app.use('/auth',authRouters);
 // //   res.send('Xin chao cac ban')
 // // })
 
-app.listen(port, () => {
-    console.log(`Server đang chạy tại port ${port}`);
+server.listen(port, () => {
+    console.log(`Server Socket đang chạy tại port ${port}`);
 });

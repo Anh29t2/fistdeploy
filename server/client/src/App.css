@@ -110,7 +110,27 @@ body {
   padding: 15px;
   border-radius: 12px;
   min-height: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
   box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+/* Tùy chỉnh thanh cuộn cho đẹp */
+.kanban-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kanban-column::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05); 
+  border-radius: 10px;
+}
+
+.kanban-column::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2); 
+  border-radius: 10px;
+}
+
+.kanban-column::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.4); 
 }
 
 .column-header {
@@ -193,20 +213,93 @@ body {
   font-weight: 800;
 }
 
-/* --- MOBILE RESPONSIVE (QUAN TRỌNG) --- */
+/* --- MOBILE RESPONSIVE (Giao diện điện thoại) --- */
 @media (max-width: 768px) {
-  /* Chuyển Kanban thành dọc */
-  .kanban-board { flex-direction: column; gap: 15px; }
   
-  /* Nút logout nhỏ gọn hơn */
-  .btn-logout-fixed { 
-    top: 15px; right: 15px; padding: 6px 12px; font-size: 13px; 
+  /* 1. Chỉnh lại khung chính */
+  .home-container {
+    margin-top: 70px !important; /* Đẩy xuống vừa phải */
+    width: 90% !important;       /* Rộng ra 2 bên */
+    padding: 15px !important;    /* Padding nhỏ hơn cho đỡ tốn chỗ */
+    background: rgba(255, 255, 255, 0.95); /* Nền đậm hơn chút cho dễ đọc */
   }
   
-  /* Đẩy container xuống để không bị nút logout che */
-  .home-container { margin-top: 60px !important; padding: 20px !important; width: 95%; }
+  /* 2. Nút Logout nhỏ xinh */
+  .btn-logout-fixed { 
+    top: 15px; 
+    right: 15px; 
+    padding: 6px 12px; 
+    font-size: 12px; 
+    border-radius: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
   
-  .kanban-controls { flex-direction: column; }
-  .control-input, .btn-add { width: 100%; }
+  /* 3. Tiêu đề nhỏ lại chút */
+  .home-header h2 { font-size: 24px; }
+  .home-header p { font-size: 14px; }
+
+  /* 4. Thanh điều khiển (Input) */
+  .kanban-controls { 
+    flex-direction: column; /* Xếp dọc */
+    gap: 10px;
+  }
+  
+  .control-input { 
+    width: 100%; /* Full màn hình */
+    font-size: 16px; /* Chữ to dễ đọc */
+    padding: 12px;
+  }
+  
+  .add-form { 
+    flex-direction: row; /* Input và nút Thêm vẫn nằm ngang */
+    width: 100%;
+  }
+  
+  .add-form .btn-submit { 
+    width: 80px; /* Nút Thêm nhỏ gọn */
+    margin-top: 0;
+    padding: 0;
+    height: 46px; /* Cao bằng ô input */
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+  }
+
+  /* 5. Cột Kanban trên mobile */
+  .kanban-board { 
+    flex-direction: column; /* Xếp chồng lên nhau */
+    gap: 20px;
+  }
+  
+  .kanban-column {
+    background: #fff; /* Nền trắng cho sạch */
+    border: 1px solid #eee;
+    border-radius: 12px;
+    min-height: auto; /* Không bắt buộc chiều cao tối thiểu */
+    max-height: 300px; /* Giới hạn chiều cao */
+    overflow-y: auto;  /* Cho phép cuộn nếu dài quá */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05); /* Đổ bóng nhẹ */
+  }
+
+  /* Tiêu đề cột */
+  .column-header {
+    background: #f9fafb;
+    margin: -15px -15px 15px -15px; /* Kéo full viền */
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    border-radius: 12px 12px 0 0;
+    font-size: 13px;
+  }
+
+  /* Nút xóa trên thẻ hiện luôn (vì điện thoại không có chuột để hover) */
+  .task-item button { 
+    opacity: 1; 
+    color: #ff4d4f; 
+    background: #fff0f0; /* Nền đỏ nhạt cho dễ bấm */
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
 }
 

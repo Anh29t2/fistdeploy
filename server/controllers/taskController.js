@@ -22,6 +22,8 @@ exports.createTask = async (req, res) => {
             'INSERT INTO tasks (user_id, title) VALUES (?, ?)',
             [user_id, title]
         );
+        const io = req.app.get('socketio');
+        io.emit('server_update_data');
         res.status(201).json({ message: 'Thêm công việc thành công!' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -37,6 +39,8 @@ exports.updateTask = async (req, res) => {
             'UPDATE tasks SET title = ?, status = ? WHERE id = ?',
             [title, status, id]
         );
+        const io = req.app.get('socketio');
+        io.emit('server_update_data');
         res.json({ message: 'Cập nhật thành công!' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -48,6 +52,8 @@ exports.deleteTask = async (req, res) => {
     const { id } = req.params;
     try {
         await connection.promise().query('DELETE FROM tasks WHERE id = ?', [id]);
+        const io = req.app.get('socketio');
+        io.emit('server_update_data');
         res.json({ message: 'Xóa thành công!' });
     } catch (error) {
         res.status(500).json({ error: error.message });

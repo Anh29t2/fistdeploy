@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import './App.css';
+import io from "socket.io-client";
 
 function Home({ user, onLogout }) {
   const [tasks, setTasks] = useState([]); 
@@ -18,9 +19,25 @@ function Home({ user, onLogout }) {
     } catch (error) { console.error("Lỗi:", error); }
   };
 
-  useEffect(() => { fetchTasks(); }, []);
+    useEffect(() => {
+    // 1. Gọi dữ liệu lần đầu tiên khi vào trang
+    fetchTasks();
 
-  const handleAddTask = async (e) => {
+    // 2. Kết nối tới Server Socket
+    const API_URL = "https://fistdeploy.onrender.com"; 
+    const socket = io(API_URL);
+
+    // 3. Lắng nghe sự kiện "server_update_data" từ Backend
+    socket.on('server_update_data', () => {
+        console.log(" Có thay đổi dữ liệu, đang tải lại...");
+        fetchTasks(); // Tự động gọi lại API lấy danh sách mới
+    });
+
+    // 4. Dọn dẹp: Ngắt kết nối khi thoát trang (để tránh lag máy)
+    return () => {
+        socket.disconnect();
+    };
+  }, []); const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTask.trim()) return;
     try {
