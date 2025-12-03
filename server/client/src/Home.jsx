@@ -93,10 +93,10 @@ function Home({ user, onLogout }) {
   return (
     <>
       <button onClick={onLogout} className="btn-logout-fixed">
-        Đăng xuất ↪️
+        Đăng xuất
       </button>
 
-      <div className="auth-container home-container">
+      <div className="dashboard-container">
         <div className="home-header">
             <h2>Bảng công việc</h2>
             <p style={{color: '#666'}}>Xin chào, <b>{user.name}</b></p>
