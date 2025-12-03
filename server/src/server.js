@@ -1,6 +1,9 @@
-const express = require('express')
-const cors = require('cors')
-
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const { Server } = require("socket.io");
+const authRouters = require('../routes/authRoutes.js');
+const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
 require('dotenv').config();
 
 const app = express();
@@ -13,10 +16,6 @@ app.use(express.json());
 // Tao ket noi den database MySQL
 const connection = require('../config/db.js');
 
-const authRouters = require('../routes/authRoutes.js');
-const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
-const http = require('http');
-const { Server } = require("socket.io");
 app.use('/tasks', taskRoutes);
 app.use('/auth',authRouters);
 
@@ -24,7 +23,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors:{
     origin: "*",
-    methods: ["GET, POST, PUT, DELETE"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
     }
 });
 // Lưu biến 'io' vào app để dùng được ở trong Controller

@@ -11,33 +11,44 @@ function Home({ user, onLogout }) {
   const [editingTask, setEditingTask] = useState(null); 
   const [deletingTask, setDeletingTask] = useState(null);
 
+  // 1. Hàm lấy dữ liệu (Thêm kiểm tra an toàn để không bị sập app)
   const fetchTasks = async () => {
     try {
       const response = await fetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`);
       const data = await response.json();
-      setTasks(data); 
-    } catch (error) { console.error("Lỗi:", error); }
+      
+      // Quan trọng: Chỉ set state nếu dữ liệu trả về là một Mảng (Array)
+      if (Array.isArray(data)) {
+        setTasks(data);
+      } else {
+        console.error("Dữ liệu lỗi từ server:", data);
+        // Không set tasks linh tinh để tránh lỗi .filter()
+      }
+    } catch (error) { 
+        console.error("Lỗi kết nối:", error); 
+    }
   };
 
-    useEffect(() => {
-    // 1. Gọi dữ liệu lần đầu tiên khi vào trang
-    fetchTasks();
+  // 2. useEffect: Chỉ duy nhất chỗ này được gọi fetchTasks tự động
+  useEffect(() => {
+    fetchTasks(); // Gọi lần đầu khi vào trang
 
-    // 2. Kết nối tới Server Socket
     const API_URL = "https://fistdeploy.onrender.com"; 
     const socket = io(API_URL);
 
-    // 3. Lắng nghe sự kiện "server_update_data" từ Backend
+    // Lắng nghe tín hiệu từ server
     socket.on('server_update_data', () => {
-        console.log(" Có thay đổi dữ liệu, đang tải lại...");
-        fetchTasks(); // Tự động gọi lại API lấy danh sách mới
+        console.log("🔔 Có thay đổi dữ liệu, đang tải lại...");
+        fetchTasks(); 
     });
 
-    // 4. Dọn dẹp: Ngắt kết nối khi thoát trang (để tránh lag máy)
     return () => {
         socket.disconnect();
     };
-  }, []); const handleAddTask = async (e) => {
+  }, []);
+
+  // 3. Hàm Thêm (Đã xóa fetchTasks)
+  const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTask.trim()) return;
     try {
@@ -49,11 +60,12 @@ function Home({ user, onLogout }) {
       if (response.ok) {
         toast.success("Thêm thành công!");
         setNewTask(""); 
-        fetchTasks(); 
+        // fetchTasks(); <-- ĐÃ XÓA (Để Socket tự lo)
       }
     } catch (error) { toast.error("Lỗi thêm việc!"); }
   };
 
+  // 4. Hàm Xóa (Đã xóa fetchTasks)
   const confirmDelete = async () => {
     if (!deletingTask) return;
     try {
@@ -61,11 +73,12 @@ function Home({ user, onLogout }) {
       if (response.ok) {
         toast.success("Đã xóa!");
         setDeletingTask(null); 
-        fetchTasks();
+        // fetchTasks(); <-- ĐÃ XÓA
       }
     } catch (error) { toast.error("Lỗi xóa!"); }
   };
 
+  // 5. Hàm Sửa (Đã xóa fetchTasks)
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
     try {
@@ -77,7 +90,7 @@ function Home({ user, onLogout }) {
       if (response.ok) {
         toast.info("Đã cập nhật!");
         setEditingTask(null);
-        fetchTasks();
+        // fetchTasks(); <-- ĐÃ XÓA
       }
     } catch (error) { toast.error("Lỗi cập nhật!"); }
   };
@@ -102,7 +115,7 @@ function Home({ user, onLogout }) {
             className="btn-delete-mini"
             onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
         >
-            ×
+            Xóa
         </button>
     </div>
   );
