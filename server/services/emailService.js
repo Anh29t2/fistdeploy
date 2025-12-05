@@ -34,4 +34,26 @@ const sendWelcomeEmail = async (userEmail, userName) => {
     await transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendWelcomeEmail };
+// Hàm 2: Gửi mật khẩu mới (Khi quên mật khẩu) - MỚI THÊM
+const sendResetEmail = async (userEmail, newPassword) => {
+    const mailOptions = {
+        from: '"My App" <no-reply@todoapp.com>',
+        to: userEmail,
+        subject: '🔐 Cấp lại mật khẩu mới',
+        html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #FF5722;">Quên mật khẩu?</h2>
+                <p>Chúng tôi đã nhận được yêu cầu cấp lại mật khẩu của bạn.</p>
+                <p>Mật khẩu mới của bạn là: <b style="font-size: 24px; color: #333; letter-spacing: 2px;">${newPassword}</b></p>
+                <br/>
+                <p>Vui lòng đăng nhập và đổi lại mật khẩu ngay nhé!</p>
+                <hr style="border: none; border-top: 1px solid #eee" />
+                <small style="color: #888">Đây là email tự động.</small>
+            </div>
+        `
+    };
+    await transporter.sendMail(mailOptions);
+};
+
+// Xuất cả 2 hàm ra để Controller dùng
+module.exports = { sendWelcomeEmail, sendResetEmail };

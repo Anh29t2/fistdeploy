@@ -1,8 +1,7 @@
 const connection = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { sendWelcomeEmail } = require('../services/emailService');
-
+const { sendWelcomeEmail, sendResetEmail } = require('../services/emailService');
 // 1. Xử lý Đăng Ký
 exports.register = async (req, res) => {
     const { email, name, password } = req.body;
@@ -63,3 +62,31 @@ exports.login = async (req, res) => {
             res.status(500).json({ error: error.message});
         }
     };
+
+// === HÀM MỚI: QUÊN MẬT KHẨU ===
+exports.forgotPassword = async (req, res) => {
+    const { email } = req.body;
+    try {
+        // 1. Kiểm tra email có tồn tại không
+        const [rows] = await connection.promise().query('SELECT * FROM users WHERE email = ?', [email]);
+        if (rows.length === 0) return res.status(404).json({ message: 'Email này chưa đăng ký tài khoản!' });
+
+        // 2. Tạo mật khẩu ngẫu nhiên (8 ký tự)
+        const newPassword = Math.random().toString(36).slice(-8);
+
+        // 3. Mã hóa mật khẩu mới
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // 4. Cập nhật vào Database
+        await connection.promise().query('UPDATE users SET password = ? WHERE email = ?', [hashedPassword, email]);
+
+        // 5. Gửi email (Chạy ngầm)
+        sendResetEmail(email, newPassword).catch(console.error);
+
+        res.json({ message: 'Mật khẩu mới đã được gửi vào email của bạn!' });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
