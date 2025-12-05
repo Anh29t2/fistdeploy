@@ -1,53 +1,88 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import './App.css';
+// 1. Import các thành phần Kéo Thả
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; 
 import io from "socket.io-client";
 
 function Home({ user, onLogout }) {
   const [tasks, setTasks] = useState([]); 
   const [newTask, setNewTask] = useState("");
-  const [searchTerm, setSearchTerm] = useState(""); // Chỉ cần tìm kiếm, bỏ bộ lọc dropdown
+  const [searchTerm, setSearchTerm] = useState(""); 
   
   const [editingTask, setEditingTask] = useState(null); 
   const [deletingTask, setDeletingTask] = useState(null);
 
-  // 1. Hàm lấy dữ liệu (Thêm kiểm tra an toàn để không bị sập app)
+  // --- 1. LẤY DỮ LIỆU ---
   const fetchTasks = async () => {
     try {
       const response = await fetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`);
       const data = await response.json();
       
-      // Quan trọng: Chỉ set state nếu dữ liệu trả về là một Mảng (Array)
       if (Array.isArray(data)) {
         setTasks(data);
       } else {
-        console.error("Dữ liệu lỗi từ server:", data);
-        // Không set tasks linh tinh để tránh lỗi .filter()
+        console.error("Dữ liệu lỗi:", data);
+        setTasks([]);
       }
     } catch (error) { 
         console.error("Lỗi kết nối:", error); 
     }
   };
 
-  // 2. useEffect: Chỉ duy nhất chỗ này được gọi fetchTasks tự động
+  // --- 2. KẾT NỐI REAL-TIME ---
   useEffect(() => {
-    fetchTasks(); // Gọi lần đầu khi vào trang
+    fetchTasks(); 
 
     const API_URL = "https://fistdeploy.onrender.com"; 
     const socket = io(API_URL);
 
-    // Lắng nghe tín hiệu từ server
     socket.on('server_update_data', () => {
-        console.log("🔔 Có thay đổi dữ liệu, đang tải lại...");
-        fetchTasks(); 
+        // Chỉ fetch lại nếu người dùng KHÔNG đang kéo thả (để tránh giật)
+        if (!document.body.classList.contains('is-dragging')) {
+            fetchTasks(); 
+        }
     });
 
-    return () => {
-        socket.disconnect();
-    };
+    return () => { socket.disconnect(); };
   }, []);
 
-  // 3. Hàm Thêm (Đã xóa fetchTasks)
+  // --- 3. XỬ LÝ KHI KÉO THẢ XONG (QUAN TRỌNG) ---
+  const handleDragEnd = async (result) => {
+    const { destination, source, draggableId } = result;
+
+    // Nếu thả ra ngoài hoặc thả về chỗ cũ thì thôi
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    const newStatus = destination.droppableId; // Cột mới = Trạng thái mới
+
+    // Cập nhật giao diện NGAY LẬP TỨC (Optimistic UI)
+    const updatedTasks = tasks.map(task => {
+        if (task.id.toString() === draggableId) {
+            return { ...task, status: newStatus };
+        }
+        return task;
+    });
+    setTasks(updatedTasks);
+
+    // Gọi API cập nhật ngầm bên dưới
+    try {
+        await fetch(`https://fistdeploy.onrender.com/tasks/${draggableId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                title: tasks.find(t => t.id.toString() === draggableId)?.title, 
+                status: newStatus 
+            })
+        });
+    } catch (error) {
+        toast.error("Lỗi cập nhật vị trí!");
+        fetchTasks(); // Load lại nếu lỗi
+    }
+  };
+
+  // --- 4. THÊM MỚI ---
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTask.trim()) return;
@@ -60,12 +95,11 @@ function Home({ user, onLogout }) {
       if (response.ok) {
         toast.success("Thêm thành công!");
         setNewTask(""); 
-        // fetchTasks(); <-- ĐÃ XÓA (Để Socket tự lo)
       }
     } catch (error) { toast.error("Lỗi thêm việc!"); }
   };
 
-  // 4. Hàm Xóa (Đã xóa fetchTasks)
+  // --- 5. XÓA ---
   const confirmDelete = async () => {
     if (!deletingTask) return;
     try {
@@ -73,12 +107,11 @@ function Home({ user, onLogout }) {
       if (response.ok) {
         toast.success("Đã xóa!");
         setDeletingTask(null); 
-        // fetchTasks(); <-- ĐÃ XÓA
       }
     } catch (error) { toast.error("Lỗi xóa!"); }
   };
 
-  // 5. Hàm Sửa (Đã xóa fetchTasks)
+  // --- 6. SỬA ---
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
     try {
@@ -90,35 +123,18 @@ function Home({ user, onLogout }) {
       if (response.ok) {
         toast.info("Đã cập nhật!");
         setEditingTask(null);
-        // fetchTasks(); <-- ĐÃ XÓA
       }
     } catch (error) { toast.error("Lỗi cập nhật!"); }
   };
 
-  // --- LOGIC KANBAN: Lọc và chia 3 nhóm ---
-  // 1. Lọc theo từ khóa tìm kiếm trước
+  // --- CHUẨN BỊ DỮ LIỆU CHO 3 CỘT ---
   const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
   
-  // 2. Chia về 3 cột
-  const pendingTasks = filteredTasks.filter(t => t.status === 'pending');
-  const processingTasks = filteredTasks.filter(t => t.status === 'processing');
-  const completedTasks = filteredTasks.filter(t => t.status === 'completed');
-
-  // Hàm hiển thị Card (Dùng chung cho 3 cột)
-  const renderTaskCard = (task, borderColors) => (
-    <div key={task.id} className="task-card" 
-         onClick={() => setEditingTask(task)}
-         style={{borderLeftColor: borderColors}} // Màu viền trái theo trạng thái
-    >
-        <div className="task-content">{task.title}</div>
-        <button 
-            className="btn-delete-mini"
-            onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
-        >
-            Xóa
-        </button>
-    </div>
-  );
+  const columns = {
+    pending: { title: "⏳ Chờ xử lý", items: filteredTasks.filter(t => t.status === 'pending'), color: "#ff9f1a" },
+    processing: { title: "🔥 Đang làm", items: filteredTasks.filter(t => t.status === 'processing'), color: "#0052cc" },
+    completed: { title: "✅ Hoàn thành", items: filteredTasks.filter(t => t.status === 'completed'), color: "#36b37e" }
+  };
 
   return (
     <>
@@ -126,7 +142,9 @@ function Home({ user, onLogout }) {
         Đăng xuất
       </button>
 
+      {/* Dùng class dashboard-container để căn giữa đẹp hơn */}
       <div className="dashboard-container">
+        
         <div className="home-header">
             <h2>Bảng công việc</h2>
             <p style={{color: '#666'}}>Xin chào, <b>{user.name}</b></p>
@@ -137,58 +155,76 @@ function Home({ user, onLogout }) {
             <input 
                 type="text" placeholder="🔍 Tìm kiếm..." 
                 className="control-input form-input"
-                style={{flex: 1}}
                 value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <form onSubmit={handleAddTask} style={{display: 'flex', gap: '10px', flex: 1}}>
+            <form onSubmit={handleAddTask} className="add-form">
                 <input 
                     type="text" placeholder="Việc mới..." 
                     className="control-input form-input"
                     value={newTask} onChange={(e) => setNewTask(e.target.value)}
                 />
-                <button type="submit" className="btn-add">Thêm</button>
+                <button type="submit" className="btn-submit">Thêm</button>
             </form>
         </div>
 
-        {/* --- BẢNG KANBAN 3 CỘT --- */}
-        <div className="kanban-board">
-            
-            {/* Cột 1: Chờ xử lý */}
-            <div className="kanban-column">
-                <div className="column-header" style={{color: '#ff9f1a'}}>
-                    <span>⏳</span> Chờ xử lý ({pendingTasks.length})
-                </div>
-                {pendingTasks.map(t => renderTaskCard(t, '#ff9f1a'))}
-                {pendingTasks.length === 0 && <p style={{fontSize:12, color:'#999', fontStyle:'italic'}}>Trống</p>}
+        {/* --- KHU VỰC BẢNG KANBAN (3 CỘT) --- */}
+        <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="kanban-board">
+                {Object.entries(columns).map(([columnId, column]) => (
+                    <Droppable key={columnId} droppableId={columnId}>
+                        {(provided, snapshot) => (
+                            <div 
+                                className="kanban-column"
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                style={{
+                                    backgroundColor: snapshot.isDraggingOver ? '#e3f2fd' : undefined
+                                }}
+                            >
+                                <div className="column-header" style={{color: column.color}}>
+                                    {column.title} ({column.items.length})
+                                </div>
+                                
+                                {column.items.map((task, index) => (
+                                    <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                                        {(provided, snapshot) => (
+                                            <div
+                                                ref={provided.innerRef}
+                                                {...provided.draggableProps}
+                                                {...provided.dragHandleProps}
+                                                className="task-card"
+                                                onClick={() => setEditingTask(task)}
+                                                style={{
+                                                    ...provided.draggableProps.style,
+                                                    borderLeft: `4px solid ${column.color}`, // Viền màu theo cột
+                                                    opacity: snapshot.isDragging ? 0.8 : 1
+                                                }}
+                                            >
+                                                <div className="task-content">{task.title}</div>
+                                                <button 
+                                                    className="btn-delete-mini"
+                                                    onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
+                                                >
+                                                    X
+                                                </button>
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ))}
+                                {provided.placeholder}
+                            </div>
+                        )}
+                    </Droppable>
+                ))}
             </div>
-
-            {/* Cột 2: Đang làm */}
-            <div className="kanban-column">
-                <div className="column-header" style={{color: '#0052cc'}}>
-                    <span>🔥</span> Đang làm ({processingTasks.length})
-                </div>
-                {processingTasks.map(t => renderTaskCard(t, '#0052cc'))}
-            </div>
-
-            {/* Cột 3: Hoàn thành */}
-            <div className="kanban-column">
-                <div className="column-header" style={{color: '#36b37e'}}>
-                    <span>✅</span> Hoàn thành ({completedTasks.length})
-                </div>
-                {completedTasks.map(t => renderTaskCard(t, '#36b37e'))}
-            </div>
-
-        </div>
+        </DragDropContext>
       </div>
 
       {/* --- POPUP SỬA --- */}
       {editingTask && (
         <div className="modal-overlay" onClick={() => setEditingTask(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Chỉnh sửa</h3>
-                <button className="modal-close" onClick={() => setEditingTask(null)}>×</button>
-              </div>
+              <div className="modal-header"><h3>Chỉnh sửa</h3><button className="modal-close" onClick={() => setEditingTask(null)}>×</button></div>
               <label>Tên công việc</label>
               <input type="text" className="modal-input" value={editingTask.title} onChange={(e) => setEditingTask({...editingTask, title: e.target.value})} />
               <label>Trạng thái</label>
@@ -209,10 +245,7 @@ function Home({ user, onLogout }) {
       {deletingTask && (
         <div className="modal-overlay" onClick={() => setDeletingTask(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
-              <div className="modal-header">
-                <h3 style={{color: '#ff4d4f'}}>Xác nhận xóa?</h3>
-                <button className="modal-close" onClick={() => setDeletingTask(null)}>×</button>
-              </div>
+              <div className="modal-header"><h3 style={{color: '#ff4d4f'}}>Xác nhận xóa?</h3><button className="modal-close" onClick={() => setDeletingTask(null)}>×</button></div>
               <p>Bạn muốn xóa: <b>{deletingTask.title}</b>?</p>
               <div className="modal-actions">
                   <button onClick={() => setDeletingTask(null)} className="modal-btn modal-cancel">Thôi</button>

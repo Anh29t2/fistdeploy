@@ -144,7 +144,17 @@ body {
   margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   cursor: pointer; transition: transform 0.2s; position: relative;
   border-left: 4px solid transparent; /* Viền màu bên trái */
+  z-index: 1000;
+  box-sizing: border-box;
+  margin-top: 10px;
 }
+/* Thêm style riêng cho trạng thái ĐANG KÉO (Dragging) */
+.task-card[data-rbd-dragging-state="dragging"] {
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2); /* Đổ bóng đậm hơn */
+  transform: rotate(3deg); /* Xoay nhẹ cho đẹp */
+  border: 2px solid #0052cc; /* Viền xanh để biết đang cầm cái nào */
+}
+
 .task-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
 .task-content { font-weight: 500; font-size: 15px; margin-right: 25px; line-height: 1.4; word-break: break-word; }
