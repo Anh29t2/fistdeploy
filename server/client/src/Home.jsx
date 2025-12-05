@@ -13,29 +13,56 @@ function Home({ user, onLogout }) {
   const [editingTask, setEditingTask] = useState(null); 
   const [deletingTask, setDeletingTask] = useState(null);
 
-  // Hàm lấy token từ localStorage
-  const getToken = () => localStorage.getItem('access_token');
+  // === 1. HÀM HỖ TRỢ GỌI API (QUAN TRỌNG NHẤT) ===
+  // Hàm này tự động thêm Token và tự động Logout nếu token hết hạn
+  const authenticatedFetch = async (url, options = {}) => {
+    const token = localStorage.getItem('access_token');
+    
+    // Nếu không có token trong máy -> Đá ra ngay
+    if (!token) {
+        onLogout();
+        return null;
+    }
 
-  // --- 1. LẤY DỮ LIỆU ---
-  const fetchTasks = async () => {
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        ...options.headers // Gộp với các header khác (nếu có)
+    };
+
     try {
-      const response = await fetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`,{
-      // GỬI KÈM TOKEN
-        headers: { 'Authorization': `Bearer ${getToken()}` }
-      });
-      
-      if (response.status === 401 || response.status === 403) {
-        toast.error("Hết phiên đăng nhập!");
-        onLogout(); // Tự động đăng xuất nếu token hết hạn
-        return;
-      }
+        const response = await fetch(url, { ...options, headers });
 
-      const data = await response.json();
-      if (Array.isArray(data)) setTasks(data);
-    } catch (error) { console.error("Lỗi:", error); }
+        // Nếu Server trả về 401 (Chưa đăng nhập) hoặc 403 (Hết hạn)
+        if (response.status === 401 || response.status === 403) {
+            toast.error("Hết phiên đăng nhập! Vui lòng đăng nhập lại.");
+            onLogout(); // Gọi hàm đăng xuất từ App.jsx
+            return null;
+        }
+
+        return response; // Trả về kết quả nếu ổn
+    } catch (error) {
+        console.error("Lỗi mạng:", error);
+        return null;
+    }
   };
 
-  // --- 2. KẾT NỐI REAL-TIME ---
+  // --- 2. LẤY DỮ LIỆU ---
+  const fetchTasks = async () => {
+    // Dùng hàm fetch thông minh ở trên
+    const response = await authenticatedFetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`);
+    
+    if (response && response.ok) {
+        const data = await response.json();
+        // Kiểm tra kỹ dữ liệu để tránh sập app
+        if (Array.isArray(data)) {
+            setTasks(data);
+        } else {
+            setTasks([]);
+        }
+    }
+  };
+
+  // --- 3. KẾT NỐI REAL-TIME ---
   useEffect(() => {
     fetchTasks(); 
 
@@ -52,15 +79,14 @@ function Home({ user, onLogout }) {
     return () => { socket.disconnect(); };
   }, []);
 
-  // --- 3. XỬ LÝ KHI KÉO THẢ XONG (QUAN TRỌNG) ---
+  // --- 4. XỬ LÝ KHI KÉO THẢ XONG ---
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
 
-    // Nếu thả ra ngoài hoặc thả về chỗ cũ thì thôi
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    const newStatus = destination.droppableId; // Cột mới = Trạng thái mới
+    const newStatus = destination.droppableId; 
 
     // Cập nhật giao diện NGAY LẬP TỨC (Optimistic UI)
     const updatedTasks = tasks.map(task => {
@@ -71,77 +97,68 @@ function Home({ user, onLogout }) {
     });
     setTasks(updatedTasks);
 
-    // Gọi API cập nhật ngầm bên dưới
-    try {
-        await fetch(`https://fistdeploy.onrender.com/tasks/${draggableId}`, {
-            method: 'PUT',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${getToken()}` // <--- Thêm token  
-            },
-            body: JSON.stringify({ 
-                title: tasks.find(t => t.id.toString() === draggableId)?.title, 
-                status: newStatus 
-            })
-        });
-    } catch (error) {
-        toast.error("Lỗi cập nhật vị trí!");
-        fetchTasks(); // Load lại nếu lỗi
-    }
+    // Gọi API cập nhật ngầm
+    await authenticatedFetch(`https://fistdeploy.onrender.com/tasks/${draggableId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            title: tasks.find(t => t.id.toString() === draggableId)?.title, 
+            status: newStatus 
+        })
+    });
   };
 
-  // --- 4. THÊM MỚI ---
+  // --- 5. THÊM MỚI ---
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTask.trim()) return;
-    try {
-      const response = await fetch("https://fistdeploy.onrender.com/tasks", {
+
+    const response = await authenticatedFetch("https://fistdeploy.onrender.com/tasks", {
         method: "POST",
-        headers: {
-           "Content-Type": "application/json",
-           'Authorization': `Bearer ${getToken()}` // Gửi vé        
-         },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id, title: newTask }),
-      });
-      if (response.ok) {
+    });
+
+    if (response && response.ok) {
         toast.success("Thêm thành công!");
         setNewTask(""); 
-      }
-    } catch (error) { toast.error("Lỗi thêm việc!"); }
+    } else {
+        toast.error("Lỗi thêm việc!");
+    }
   };
 
-  // --- 5. XÓA ---
+  // --- 6. XÓA ---
   const confirmDelete = async () => {
     if (!deletingTask) return;
-    try {
-      const response = await fetch(`https://fistdeploy.onrender.com/tasks/${deletingTask.id}`, { 
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${getToken()}` } // Gửi vé
-       });
-      if (response.ok) {
+
+    const response = await authenticatedFetch(`https://fistdeploy.onrender.com/tasks/${deletingTask.id}`, { 
+        method: 'DELETE'
+    });
+
+    if (response && response.ok) {
         toast.success("Đã xóa!");
         setDeletingTask(null); 
-      }
-    } catch (error) { toast.error("Lỗi xóa!"); }
+    } else {
+        toast.error("Lỗi xóa!");
+    }
   };
 
-  // --- 6. SỬA ---
+  // --- 7. SỬA ---
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
-    try {
-      const response = await fetch(`https://fistdeploy.onrender.com/tasks/${editingTask.id}`, {
+
+    const response = await authenticatedFetch(`https://fistdeploy.onrender.com/tasks/${editingTask.id}`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}` // Gửi vé
-         },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: editingTask.title, status: editingTask.status })
-      });
-      if (response.ok) {
+    });
+
+    if (response && response.ok) {
         toast.info("Đã cập nhật!");
         setEditingTask(null);
-      }
-    } catch (error) { toast.error("Lỗi cập nhật!"); }
+    } else {
+        toast.error("Lỗi cập nhật!");
+    }
   };
 
   // --- CHUẨN BỊ DỮ LIỆU CHO 3 CỘT ---
@@ -159,7 +176,6 @@ function Home({ user, onLogout }) {
         Đăng xuất
       </button>
 
-      {/* Dùng class dashboard-container để căn giữa đẹp hơn */}
       <div className="dashboard-container">
         
         <div className="home-header">
@@ -172,6 +188,7 @@ function Home({ user, onLogout }) {
             <input 
                 type="text" placeholder="🔍 Tìm kiếm..." 
                 className="control-input form-input"
+                style={{flex: 1}}
                 value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             />
             <form onSubmit={handleAddTask} className="add-form">
@@ -213,7 +230,7 @@ function Home({ user, onLogout }) {
                                                 onClick={() => setEditingTask(task)}
                                                 style={{
                                                     ...provided.draggableProps.style,
-                                                    borderLeft: `4px solid ${column.color}`, // Viền màu theo cột
+                                                    borderLeft: `4px solid ${column.color}`, 
                                                     opacity: snapshot.isDragging ? 0.8 : 1
                                                 }}
                                             >
