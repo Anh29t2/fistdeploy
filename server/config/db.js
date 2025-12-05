@@ -2,7 +2,7 @@ const mysql = require('mysql2');
 require('dotenv').config(); // Đọc file .env
 
 // Tạo kết nối
-const connection = mysql.createConnection({
+const pool = mysql.createPool({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT || 3306, // Thêm cổng
     user: process.env.DB_USER,
@@ -11,7 +11,13 @@ const connection = mysql.createConnection({
     ssl: {
         minVersion: 'TLSv1.2',
         rejectUnauthorized: true
-    }
+    },
+    // --- Cấu hình quan trọng để sửa lỗi "Closed State" ---
+    waitForConnections: true,
+    connectionLimit: 10,  // Cho phép tối đa 10 kết nối cùng lúc
+    queueLimit: 0,
+    enableKeepAlive: true, // Giữ kết nối sống
+    keepAliveInitialDelay: 0
 });
 
 // Mở kết nối
