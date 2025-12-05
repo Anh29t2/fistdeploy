@@ -4,12 +4,14 @@ require('dotenv').config();
 
 // 1. Cấu hình người gửi (Lấy từ .env)
     const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        },
-        logger: true, // In log ra terminal
+    host: "smtp.gmail.com", // Khai báo rõ host của Google
+    port: 465,              // Ép dùng cổng 465 (SSL) để tránh bị Render chặn
+    secure: true,           // Bắt buộc dùng SSL
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    },
+    logger: true,
     debug: true
     });
 
