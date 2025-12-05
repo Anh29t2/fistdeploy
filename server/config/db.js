@@ -1,17 +1,20 @@
 const mysql = require('mysql2');
-require('dotenv').config(); // Đọc file .env
+require('dotenv').config(); 
 
-// Tạo kết nối
+// Dùng createPool thay vì createConnection
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 3306, // Thêm cổng
+    port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
+    
+    // Cấu hình SSL (giữ nguyên như của bạn để kết nối cloud)
     ssl: {
         minVersion: 'TLSv1.2',
         rejectUnauthorized: true
     },
+
     // --- Cấu hình quan trọng để sửa lỗi "Closed State" ---
     waitForConnections: true,
     connectionLimit: 10,  // Cho phép tối đa 10 kết nối cùng lúc
@@ -20,11 +23,15 @@ const pool = mysql.createPool({
     keepAliveInitialDelay: 0
 });
 
-// Mở kết nối
-connection.connect(err => {
-    if (err) console.error('❌ Lỗi kết nối DB: ' + err.stack);
-    else console.log('✅ Đã kết nối Database thành công!');
+// Kiểm tra kết nối thử (Optional - chỉ để debug lúc khởi động)
+pool.getConnection((err, connection) => {
+    if (err) {
+        console.error('❌ Lỗi kết nối Pool: ' + err.stack);
+    } else {
+        console.log('✅ Database Pool đã sẵn sàng!');
+        connection.release(); // Trả kết nối về hồ ngay
+    }
 });
 
-// Xuất kết nối ra để file khác dùng
-module.exports = connection;
+// Xuất pool ra (Code bên controller dùng y hệt connection cũ, không cần sửa gì thêm)
+module.exports = pool;
