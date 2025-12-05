@@ -13,6 +13,9 @@ function Home({ user, onLogout }) {
   const [editingTask, setEditingTask] = useState(null); 
   const [deletingTask, setDeletingTask] = useState(null);
 
+  // Hàm lấy token từ localStorage
+  const getToken = () => localStorage.getItem('access_token');
+
   // --- 1. LẤY DỮ LIỆU ---
   const fetchTasks = async () => {
     try {

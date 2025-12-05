@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { Link } from "react-router-dom"; // 1. Import Link
+import { Link } from "react-router-dom"; 
 
-// Bỏ prop onSwitchForm đi vì k dùng nữa
 function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // State cho Popup Quên mật khẩu
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
 
+  // Xử lý Đăng nhập
   const handleLogin = async (e) => {
     e.preventDefault();
     if(!email || !password) {
@@ -26,16 +27,18 @@ function Login({ onLoginSuccess }) {
       
       if (response.ok) {
         toast.success("🎉 Đăng nhập thành công!");
+        // Lưu token vào localStorage (nếu có)
+        if (data.token) localStorage.setItem('access_token', data.token);
         onLoginSuccess(data.user); 
       } else {
-        toast.error("❌ " + data.message || data.error);
+        toast.error("❌ " + (data.message || data.error));
       }
     } catch (error) {
       toast.error("Lỗi kết nối server!");
     }
   };
 
-  // Hàm xử lý gửi yêu cầu quên mật khẩu
+  // Xử lý Gửi yêu cầu quên mật khẩu
   const handleForgotPassword = async () => {
     if (!forgotEmail) return toast.warning("Vui lòng nhập email!");
     try {
@@ -45,16 +48,18 @@ function Login({ onLoginSuccess }) {
             body: JSON.stringify({ email: forgotEmail })
         });
         const data = await res.json();
+        
         if (res.ok) {
             toast.success(data.message);
-            setShowForgot(false); // Tắt popup
+            setShowForgot(false); // Tắt popup sau khi gửi thành công
+            setForgotEmail(""); // Xóa trắng ô nhập
         } else {
             toast.error(data.message);
         }
     } catch (err) { toast.error("Lỗi kết nối!"); }
   };
 
- return (
+  return (
     <>
       <div className="auth-container">
         <h2 className="auth-title">Đăng Nhập</h2>
