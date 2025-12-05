@@ -75,7 +75,10 @@ function Home({ user, onLogout }) {
     try {
         await fetch(`https://fistdeploy.onrender.com/tasks/${draggableId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${getToken()}` // <--- Thêm token  
+            },
             body: JSON.stringify({ 
                 title: tasks.find(t => t.id.toString() === draggableId)?.title, 
                 status: newStatus 
