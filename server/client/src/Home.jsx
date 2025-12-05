@@ -16,18 +16,20 @@ function Home({ user, onLogout }) {
   // --- 1. LẤY DỮ LIỆU ---
   const fetchTasks = async () => {
     try {
-      const response = await fetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`);
-      const data = await response.json();
+      const response = await fetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`,{
+      // GỬI KÈM TOKEN
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
       
-      if (Array.isArray(data)) {
-        setTasks(data);
-      } else {
-        console.error("Dữ liệu lỗi:", data);
-        setTasks([]);
+      if (response.status === 401 || response.status === 403) {
+        toast.error("Hết phiên đăng nhập!");
+        onLogout(); // Tự động đăng xuất nếu token hết hạn
+        return;
       }
-    } catch (error) { 
-        console.error("Lỗi kết nối:", error); 
-    }
+
+      const data = await response.json();
+      if (Array.isArray(data)) setTasks(data);
+    } catch (error) { console.error("Lỗi:", error); }
   };
 
   // --- 2. KẾT NỐI REAL-TIME ---
@@ -89,7 +91,10 @@ function Home({ user, onLogout }) {
     try {
       const response = await fetch("https://fistdeploy.onrender.com/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+           "Content-Type": "application/json",
+           'Authorization': `Bearer ${getToken()}` // Gửi vé        
+         },
         body: JSON.stringify({ user_id: user.id, title: newTask }),
       });
       if (response.ok) {
@@ -103,7 +108,10 @@ function Home({ user, onLogout }) {
   const confirmDelete = async () => {
     if (!deletingTask) return;
     try {
-      const response = await fetch(`https://fistdeploy.onrender.com/tasks/${deletingTask.id}`, { method: 'DELETE' });
+      const response = await fetch(`https://fistdeploy.onrender.com/tasks/${deletingTask.id}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${getToken()}` } // Gửi vé
+       });
       if (response.ok) {
         toast.success("Đã xóa!");
         setDeletingTask(null); 
@@ -117,7 +125,10 @@ function Home({ user, onLogout }) {
     try {
       const response = await fetch(`https://fistdeploy.onrender.com/tasks/${editingTask.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}` // Gửi vé
+         },
         body: JSON.stringify({ title: editingTask.title, status: editingTask.status })
       });
       if (response.ok) {

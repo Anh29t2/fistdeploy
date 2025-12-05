@@ -1,5 +1,6 @@
 const connection = require('../config/db');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sendWelcomeEmail } = require('../services/emailService');
 
 // 1. Xử lý Đăng Ký
@@ -46,12 +47,19 @@ exports.login = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: 'Mật khẩu không đúng!' });
 
-        // Trả về info
-        res.json({ 
-            message: 'Đăng nhập thành công!', 
-            user: { id: user.id, email: user.email, name: user.name } 
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
+        // tạo token
+        const token = jwt.sign(
+            {
+                id: user.id, email: user.email},
+                process.env.JWT_SECRET,
+                {expiresIn: '1h'} // ve het han sau 1h
+        );    
+            res.json({
+                message: 'Đăng nhập thành công !',
+                token: token, // Tra ve cho client
+                user: {id: user.id,email: user.email, name: user.name}
+            });
+        }catch(error){
+            res.status(500).json({ error: error.message});
+        }
+    };
