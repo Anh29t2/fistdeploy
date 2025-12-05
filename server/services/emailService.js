@@ -2,16 +2,19 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const sendWelcomeEmail = async (userEmail, userName) => {
-    // 1. Cấu hình người gửi (Lấy từ .env)
+// 1. Cấu hình người gửi (Lấy từ .env)
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
-        }
+        },
+        logger: true, // In log ra terminal
+    debug: true
     });
 
+const sendWelcomeEmail = async (userEmail, userName) => {
+    
     // 2. Nội dung email
     const mailOptions = {
         from: '"My App" <no-reply@todoapp.com>',
@@ -44,7 +47,7 @@ const sendResetEmail = async (userEmail, newPassword) => {
             <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                 <h2 style="color: #FF5722;">Quên mật khẩu?</h2>
                 <p>Chúng tôi đã nhận được yêu cầu cấp lại mật khẩu của bạn.</p>
-                <p>Mật khẩu mới của bạn là: abcd123 <b style="font-size: 24px; color: #333; letter-spacing: 2px;">${newPassword}</b></p>
+                <p>Mật khẩu mới của bạn là:<b style="font-size: 24px; color: #333; letter-spacing: 2px;">${newPassword}</b></p>
                 <br/>
                 <p>Vui lòng đăng nhập và đổi lại mật khẩu ngay nhé!</p>
                 <hr style="border: none; border-top: 1px solid #eee" />
@@ -54,6 +57,17 @@ const sendResetEmail = async (userEmail, newPassword) => {
     };
     await transporter.sendMail(mailOptions);
 };
+
+// ... (code cũ giữ nguyên)
+
+// Thêm đoạn này vào cuối file emailService.js, TRƯỚC dòng module.exports
+transporter.verify(function (error, success) {
+    if (error) {
+        console.log("❌ KẾT NỐI EMAIL THẤT BẠI: " + error);
+    } else {
+        console.log("✅ KẾT NỐI EMAIL THÀNH CÔNG! Sẵn sàng gửi mail.");
+    }
+});
 
 // Xuất cả 2 hàm ra để Controller dùng
 module.exports = { sendWelcomeEmail, sendResetEmail };

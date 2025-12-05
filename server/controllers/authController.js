@@ -67,26 +67,41 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
     try {
-        // 1. Kiểm tra email có tồn tại không
+        // 1. Kiểm tra email
         const [rows] = await connection.promise().query('SELECT * FROM users WHERE email = ?', [email]);
         if (rows.length === 0) return res.status(404).json({ message: 'Email này chưa đăng ký tài khoản!' });
 
-        // 2. Tạo mật khẩu ngẫu nhiên (8 ký tự)
+        // 2. Tạo mật khẩu mới
         const newPassword = Math.random().toString(36).slice(-8);
 
-        // 3. Mã hóa mật khẩu mới
+        // 3. Mã hóa
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        // 4. Cập nhật vào Database
+        // 4. Cập nhật DB
         await connection.promise().query('UPDATE users SET password = ? WHERE email = ?', [hashedPassword, email]);
 
-        // 5. Gửi email (Chạy ngầm)
-        sendResetEmail(email, newPassword).catch(console.error);
+        // --- SỬA ĐOẠN NÀY ---
+        // 5. Gửi email (Dùng await để bắt buộc server đợi gửi xong)
+        console.log(`Đang bắt đầu gửi mail tới: ${email}...`); // Log để xem nó có chạy không
+        
+        try {
+            await sendResetEmail(email, newPassword);
+            console.log("✅ Gửi mail thành công!");
+        } catch (mailError) {
+            console.error("❌ Lỗi CHI TIẾT khi gửi mail:", mailError);
+            // Nếu lỗi gửi mail, báo lỗi về Client luôn để bạn biết
+            return res.status(500).json({ 
+                message: 'Đổi mật khẩu thành công nhưng KHÔNG gửi được email.',
+                error_detail: mailError.message // Quan trọng: Đọc dòng này để biết lỗi gì
+            });
+        }
 
+        // Chỉ khi gửi mail thành công (hoặc không lỗi) mới chạy xuống đây
         res.json({ message: 'Mật khẩu mới đã được gửi vào email của bạn!' });
 
     } catch (error) {
+        console.error("Lỗi hệ thống:", error);
         res.status(500).json({ error: error.message });
     }
 };
