@@ -1,24 +1,41 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import './App.css';
-// 1. Import các thành phần Kéo Thả
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; 
 import io from "socket.io-client";
+import { useNavigate } from 'react-router-dom';
+import KanbanBoard from "./components/KanbanBoard";
+import AddTaskModal from "./components/AddTaskModal";
+import EditTaskModal from "./components/EditTaskModal";
+import DeleteConfirmModal from "./components/DeleteConfirmModal";
 
 function Home({ user, onLogout }) {
-  const [tasks, setTasks] = useState([]); 
-  const [newTask, setNewTask] = useState("");
-  const [searchTerm, setSearchTerm] = useState(""); 
+  const navigate = useNavigate();
+  const [tasks, setTasks] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   
-  const [editingTask, setEditingTask] = useState(null); 
+  // State cho Form Thêm mới
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState("medium");
+  const [newTaskDeadline, setNewTaskDeadline] = useState("");
+
+  // State cho Modal Sửa & Xóa
+  const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
 
-  // === 1. HÀM HỖ TRỢ GỌI API (QUAN TRỌNG NHẤT) ===
-  // Hàm này tự động thêm Token và tự động Logout nếu token hết hạn
+  // Tự động nhận diện URL Backend (Local hoặc Render)
+  const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : 'https://fistdeploy.onrender.com';
+
+  // --- 1. HÀM HELPER TOKEN & FETCH ---
+  const getToken = () => localStorage.getItem('access_token');
+
   const authenticatedFetch = async (url, options = {}) => {
-    const token = localStorage.getItem('access_token');
+    const token = getToken();
     
-    // Nếu không có token trong máy -> Đá ra ngay
+    // Nếu không có token -> Logout ngay
     if (!token) {
         onLogout();
         return null;
@@ -26,34 +43,32 @@ function Home({ user, onLogout }) {
 
     const headers = {
         'Authorization': `Bearer ${token}`,
-        ...options.headers // Gộp với các header khác (nếu có)
+        ...options.headers
     };
 
     try {
         const response = await fetch(url, { ...options, headers });
 
-        // Nếu Server trả về 401 (Chưa đăng nhập) hoặc 403 (Hết hạn)
+        // Xử lý lỗi Token hết hạn (401/403)
         if (response.status === 401 || response.status === 403) {
             toast.error("Hết phiên đăng nhập! Vui lòng đăng nhập lại.");
-            onLogout(); // Gọi hàm đăng xuất từ App.jsx
+            onLogout();
             return null;
         }
 
-        return response; // Trả về kết quả nếu ổn
+        return response;
     } catch (error) {
         console.error("Lỗi mạng:", error);
         return null;
     }
   };
 
-  // --- 2. LẤY DỮ LIỆU ---
+  // --- 2. HÀM LẤY DỮ LIỆU ---
   const fetchTasks = async () => {
-    // Dùng hàm fetch thông minh ở trên
-    const response = await authenticatedFetch(`https://fistdeploy.onrender.com/tasks?user_id=${user.id}`);
+    const response = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}`);
     
     if (response && response.ok) {
         const data = await response.json();
-        // Kiểm tra kỹ dữ liệu để tránh sập app
         if (Array.isArray(data)) {
             setTasks(data);
         } else {
@@ -62,31 +77,34 @@ function Home({ user, onLogout }) {
     }
   };
 
-  // --- 3. KẾT NỐI REAL-TIME ---
+  // --- 3. SOCKET & INITIALIZATION ---
   useEffect(() => {
     fetchTasks(); 
 
-    const API_URL = "https://fistdeploy.onrender.com"; 
     const socket = io(API_URL);
 
+    // Lắng nghe tín hiệu từ Server
     socket.on('server_update_data', () => {
-        // Chỉ fetch lại nếu người dùng KHÔNG đang kéo thả (để tránh giật)
+        // Chỉ fetch lại nếu người dùng KHÔNG đang kéo thả (để tránh giật lag)
         if (!document.body.classList.contains('is-dragging')) {
             fetchTasks(); 
         }
     });
 
-    return () => { socket.disconnect(); };
+    return () => {
+        socket.disconnect();
+    };
   }, []);
 
-  // --- 4. XỬ LÝ KHI KÉO THẢ XONG ---
+  // --- 4. XỬ LÝ KÉO THẢ (DRAG & DROP) ---
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
 
+    // Nếu thả ra ngoài bảng hoặc thả về chỗ cũ thì không làm gì
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    const newStatus = destination.droppableId; 
+    const newStatus = destination.droppableId; // Cột mới chính là trạng thái mới
 
     // Cập nhật giao diện NGAY LẬP TỨC (Optimistic UI)
     const updatedTasks = tasks.map(task => {
@@ -98,7 +116,7 @@ function Home({ user, onLogout }) {
     setTasks(updatedTasks);
 
     // Gọi API cập nhật ngầm
-    await authenticatedFetch(`https://fistdeploy.onrender.com/tasks/${draggableId}`, {
+    await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -108,30 +126,48 @@ function Home({ user, onLogout }) {
     });
   };
 
-  // --- 5. THÊM MỚI ---
+  // --- 5. XỬ LÝ THÊM MỚI ---
   const handleAddTask = async (e) => {
     e.preventDefault();
-    if (!newTask.trim()) return;
+    if (!newTaskTitle.trim()) {
+        toast.warning("Vui lòng nhập tên công việc!");
+        return;
+    }
 
-    const response = await authenticatedFetch("https://fistdeploy.onrender.com/tasks", {
+    const response = await authenticatedFetch(`${API_URL}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, title: newTask }),
+        body: JSON.stringify({ 
+            user_id: user.id, 
+            title: newTaskTitle,
+            description: newTaskDescription,
+            priority: newTaskPriority,
+            deadline: newTaskDeadline
+        }),
     });
 
     if (response && response.ok) {
         toast.success("Thêm thành công!");
-        setNewTask(""); 
+        // Reset form
+        setNewTaskTitle(""); 
+        setNewTaskDescription("");
+        setNewTaskPriority("medium");
+        setNewTaskDeadline("");
+        setIsAddingTask(false); // Đóng modal sau khi thêm
+        // Refresh task list
+        fetchTasks();
     } else {
-        toast.error("Lỗi thêm việc!");
+        const errorData = response ? await response.json() : {};
+        toast.error(errorData?.error || "Lỗi thêm việc!");
+        console.error("Error adding task:", errorData);
     }
   };
 
-  // --- 6. XÓA ---
+  // --- 6. XỬ LÝ XÓA ---
   const confirmDelete = async () => {
     if (!deletingTask) return;
 
-    const response = await authenticatedFetch(`https://fistdeploy.onrender.com/tasks/${deletingTask.id}`, { 
+    const response = await authenticatedFetch(`${API_URL}/tasks/${deletingTask.id}`, { 
         method: 'DELETE'
     });
 
@@ -143,14 +179,20 @@ function Home({ user, onLogout }) {
     }
   };
 
-  // --- 7. SỬA ---
+  // --- 7. XỬ LÝ SỬA ---
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
 
-    const response = await authenticatedFetch(`https://fistdeploy.onrender.com/tasks/${editingTask.id}`, {
+    const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editingTask.title, status: editingTask.status })
+        body: JSON.stringify({ 
+            title: editingTask.title, 
+            status: editingTask.status,
+            priority: editingTask.priority,
+            deadline: editingTask.deadline,
+            description: editingTask.description
+        })
     });
 
     if (response && response.ok) {
@@ -161,133 +203,113 @@ function Home({ user, onLogout }) {
     }
   };
 
-  // --- CHUẨN BỊ DỮ LIỆU CHO 3 CỘT ---
+  // --- CHUẨN BỊ DỮ LIỆU HIỂN THỊ ---
   const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
   
   const columns = {
-    pending: { title: "⏳ Chờ xử lý", items: filteredTasks.filter(t => t.status === 'pending'), color: "#ff9f1a" },
-    processing: { title: "🔥 Đang làm", items: filteredTasks.filter(t => t.status === 'processing'), color: "#0052cc" },
-    completed: { title: "✅ Hoàn thành", items: filteredTasks.filter(t => t.status === 'completed'), color: "#36b37e" }
+    pending: { title: "⏳ Chờ xử lý", color: "#f59e0b", items: filteredTasks.filter(t => t.status === 'pending') },
+    processing: { title: "🔥 Đang làm", color: "#3b82f6", items: filteredTasks.filter(t => t.status === 'processing') },
+    completed: { title: "✅ Hoàn thành", color: "#10b981", items: filteredTasks.filter(t => t.status === 'completed') }
+  };
+
+  // Helper format ngày
+  const formatDate = (dateString) => {
+      if (!dateString) return "";
+      return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
   return (
     <>
-      <button onClick={onLogout} className="btn-logout-fixed">
-        Đăng xuất
-      </button>
-
-      <div className="dashboard-container">
-        
-        <div className="home-header">
-            <h2>Bảng công việc</h2>
-            <p style={{color: '#666'}}>Xin chào, <b>{user.name}</b></p>
-        </div>
-
-        {/* Thanh tìm kiếm & Thêm mới */}
-        <div className="kanban-controls">
-            <input 
-                type="text" placeholder="🔍 Tìm kiếm..." 
-                className="control-input form-input"
-                style={{flex: 1}}
-                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <form onSubmit={handleAddTask} className="add-form">
-                <input 
-                    type="text" placeholder="Việc mới..." 
-                    className="control-input form-input"
-                    value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                />
-                <button type="submit" className="btn-submit">Thêm</button>
-            </form>
-        </div>
-
-        {/* --- KHU VỰC BẢNG KANBAN (3 CỘT) --- */}
-        <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="kanban-board">
-                {Object.entries(columns).map(([columnId, column]) => (
-                    <Droppable key={columnId} droppableId={columnId}>
-                        {(provided, snapshot) => (
-                            <div 
-                                className="kanban-column"
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                style={{
-                                    backgroundColor: snapshot.isDraggingOver ? '#e3f2fd' : undefined
-                                }}
-                            >
-                                <div className="column-header" style={{color: column.color}}>
-                                    {column.title} ({column.items.length})
-                                </div>
-                                
-                                {column.items.map((task, index) => (
-                                    <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
-                                        {(provided, snapshot) => (
-                                            <div
-                                                ref={provided.innerRef}
-                                                {...provided.draggableProps}
-                                                {...provided.dragHandleProps}
-                                                className="task-card"
-                                                onClick={() => setEditingTask(task)}
-                                                style={{
-                                                    ...provided.draggableProps.style,
-                                                    borderLeft: `4px solid ${column.color}`, 
-                                                    opacity: snapshot.isDragging ? 0.8 : 1
-                                                }}
-                                            >
-                                                <div className="task-content">{task.title}</div>
-                                                <button 
-                                                    className="btn-delete-mini"
-                                                    onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
-                                                >
-                                                    X
-                                                </button>
-                                            </div>
-                                        )}
-                                    </Draggable>
-                                ))}
-                                {provided.placeholder}
-                            </div>
-                        )}
-                    </Droppable>
-                ))}
-            </div>
-        </DragDropContext>
+      {/* Navigation Buttons */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 999,
+        display: 'flex',
+        gap: '10px'
+      }}>
+        <button onClick={() => navigate('/projects')} className="btn-logout-fixed" style={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          marginRight: '10px'
+        }}>
+          📁 Dự án
+        </button>
+        <button onClick={onLogout} className="btn-logout-fixed">
+          🚪 Đăng xuất
+        </button>
       </div>
 
-      {/* --- POPUP SỬA --- */}
-      {editingTask && (
-        <div className="modal-overlay" onClick={() => setEditingTask(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header"><h3>Chỉnh sửa</h3><button className="modal-close" onClick={() => setEditingTask(null)}>×</button></div>
-              <label>Tên công việc</label>
-              <input type="text" className="modal-input" value={editingTask.title} onChange={(e) => setEditingTask({...editingTask, title: e.target.value})} />
-              <label>Trạng thái</label>
-              <select className="modal-input" value={editingTask.status} onChange={(e) => setEditingTask({...editingTask, status: e.target.value})}>
-                  <option value="pending">⏳ Chờ xử lý</option>
-                  <option value="processing">🔥 Đang làm</option>
-                  <option value="completed">✅ Hoàn thành</option>
-              </select>
-              <div className="modal-actions">
-                  <button onClick={() => setEditingTask(null)} className="modal-btn modal-cancel">Hủy</button>
-                  <button onClick={handleSaveEdit} className="modal-btn modal-save">Lưu</button>
-              </div>
+      {/* Container Chính */}
+      <div className="dashboard-container">
+        
+        {/* Header */}
+        <div className="home-header">
+            <div>
+                <h2>Bảng công việc</h2>
+                <p style={{color: '#6b7280', margin:'5px 0 0'}}>Xin chào, <b>{user.name}</b> 👋</p>
             </div>
         </div>
-      )}
 
-      {/* --- POPUP XÓA --- */}
-      {deletingTask && (
-        <div className="modal-overlay" onClick={() => setDeletingTask(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
-              <div className="modal-header"><h3 style={{color: '#ff4d4f'}}>Xác nhận xóa?</h3><button className="modal-close" onClick={() => setDeletingTask(null)}>×</button></div>
-              <p>Bạn muốn xóa: <b>{deletingTask.title}</b>?</p>
-              <div className="modal-actions">
-                  <button onClick={() => setDeletingTask(null)} className="modal-btn modal-cancel">Thôi</button>
-                  <button onClick={confirmDelete} className="modal-btn modal-delete-confirm">Xóa luôn</button>
-              </div>
-            </div>
+        {/* Thanh Điều Khiển */}
+        <div className="kanban-controls">
+            <input 
+                type="text" 
+                placeholder="🔍 Tìm nhanh..." 
+                className="control-input" 
+                style={{flex: 1, minWidth: '200px'}} 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+            <button 
+                type="button" 
+                className="btn-add" 
+                onClick={() => setIsAddingTask(true)}
+            >
+                ➕ Thêm Việc Mới
+            </button>
         </div>
-      )}
+
+        {/* Bảng Kanban Kéo Thả */}
+        <KanbanBoard 
+          columns={columns}
+          onDragEnd={handleDragEnd}
+          onTaskClick={setEditingTask}
+          onDeleteClick={setDeletingTask}
+          formatDate={formatDate}
+          isDraggable={false}
+        />
+      </div>
+
+      {/* --- MODALS --- */}
+      <AddTaskModal
+        isOpen={isAddingTask}
+        onClose={() => setIsAddingTask(false)}
+        onSubmit={handleAddTask}
+        title={newTaskTitle}
+        setTitle={setNewTaskTitle}
+        description={newTaskDescription}
+        setDescription={setNewTaskDescription}
+        priority={newTaskPriority}
+        setPriority={setNewTaskPriority}
+        deadline={newTaskDeadline}
+        setDeadline={setNewTaskDeadline}
+      />
+
+      <EditTaskModal
+        isOpen={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSubmit={handleSaveEdit}
+        task={editingTask}
+        setTask={setEditingTask}
+      />
+
+      <DeleteConfirmModal
+        isOpen={!!deletingTask}
+        onClose={() => setDeletingTask(null)}
+        onConfirm={confirmDelete}
+        task={deletingTask}
+      />
     </>
   );
 }

@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require("socket.io");
 const authRouters = require('../routes/authRoutes.js');
 const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
+const projectRouters = require('../routes/projectRoutes.js')
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +19,7 @@ const connection = require('../config/db.js');
 
 app.use('/tasks', taskRoutes);
 app.use('/auth',authRouters);
+app.use('/projects',projectRouters);
 
 const server = http.createServer(app);
 const io = new Server(server, {
