@@ -150,6 +150,8 @@ export default function ProjectDetail({ user, onLogout }) {
   const handleEditTask = async (e) => {
     if (!editingTask) return;
 
+    console.log('🔄 Đang cập nhật task:', editingTask);
+
     const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -163,11 +165,15 @@ export default function ProjectDetail({ user, onLogout }) {
     });
 
     if (response && response.ok) {
+        const data = await response.json();
+        console.log('✅ Cập nhật thành công:', data);
         toast.success("Cập nhật thành công!");
         setEditingTask(null);
-        fetchTasks();
+        await fetchTasks(); // Refresh data ngay
     } else {
-        toast.error("Lỗi cập nhật!");
+        const errorData = response ? await response.json() : {};
+        console.error('❌ Lỗi cập nhật:', errorData);
+        toast.error(errorData?.error || "Lỗi cập nhật!");
     }
   };
 
@@ -189,10 +195,12 @@ export default function ProjectDetail({ user, onLogout }) {
   };
 
   // --- XỬ LÝ DRAG & DROP ---
+  // --- XỬ LÝ DRAG & DROP (Đã sửa) ---
   const handleDragEnd = async (result) => {
     const { source, destination, draggableId } = result;
-    if (!destination) return;
     
+    // 1. Kiểm tra điều kiện kéo thả hợp lệ
+    if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const task = tasks.find(t => t.id == draggableId);
@@ -200,18 +208,32 @@ export default function ProjectDetail({ user, onLogout }) {
 
     const newStatus = destination.droppableId;
     
-    // Cập nhật UI ngay lập tức
+    // 2. Cập nhật giao diện ngay lập tức (Optimistic Update)
     const newTasks = tasks.map(t => 
       t.id == draggableId ? { ...t, status: newStatus } : t
     );
     setTasks(newTasks);
 
-    // Gửi request lên server
-    await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
+    // 3. Gửi request lên server (Gửi FULL thông tin để tránh lỗi backend)
+    const response = await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ 
+            title: task.title,            
+            description: task.description, 
+            priority: task.priority,      
+            deadline: task.deadline,      
+            status: newStatus // Chỉ thay đổi cái này
+        }),
     });
+
+    // 4. Hiện thông báo Toast
+    if (response && response.ok) {
+        toast.success("Đã chuyển trạng thái!", { autoClose: 1500 });
+    } else {
+        toast.error("Lỗi cập nhật! Vui lòng thử lại.");
+        fetchTasks(); // Nếu lỗi thì tải lại dữ liệu cũ để đồng bộ
+    }
   };
 
   const filteredTasks = tasks.filter(task =>
@@ -324,7 +346,7 @@ export default function ProjectDetail({ user, onLogout }) {
         onClose={() => setEditingTask(null)}
         onSubmit={handleEditTask}
         task={editingTask}
-        onTaskChange={setEditingTask}
+        setTask={setEditingTask}
       />
 
       {/* Delete Confirm Modal */}

@@ -31,14 +31,14 @@ const io = new Server(server, {
 // Lưu biến 'io' vào app để dùng được ở trong Controller
 app.set('socketio', io);
 
-// Lắng nghe khi có người kết nối (Optional - để log cho vui)
-io.on('connection', (socket) => {
-    console.log(' Có người vừa kết nối Socket: ' + socket.id);
+// // Lắng nghe khi có người kết nối (Optional - để log cho vui)
+// io.on('connection', (socket) => {
+//     console.log(' Có người vừa kết nối Socket: ' + socket.id);
     
-    socket.on('disconnect', () => {
-        console.log('Người đó đã ngắt kết nối');
-    });
-});
+//     socket.on('disconnect', () => {
+//         console.log('Người đó đã ngắt kết nối');
+//     });
+// });
 
 // Dang ky (API)
 // app.post('/register', async (req, res) => {

@@ -185,6 +185,8 @@ function Home({ user, onLogout }) {
   // --- 7. XỬ LÝ SỬA ---
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
+    
+    console.log('🔄 Đang cập nhật task:', editingTask);
 
     const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
         method: 'PUT',
@@ -199,10 +201,15 @@ function Home({ user, onLogout }) {
     });
 
     if (response && response.ok) {
-        toast.info("Đã cập nhật!");
+        const data = await response.json();
+        console.log('✅ Cập nhật thành công:', data);
+        toast.success("Đã cập nhật!");
         setEditingTask(null);
+        await fetchTasks(); // Refresh data ngay
     } else {
-        toast.error("Lỗi cập nhật!");
+        const errorData = response ? await response.json() : {};
+        console.error('❌ Lỗi cập nhật:', errorData);
+        toast.error(errorData?.error || "Lỗi cập nhật!");
     }
   };
 

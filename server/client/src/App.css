@@ -648,3 +648,132 @@ textarea.form-control {
     grid-template-columns: 1fr;
   }
 }
+
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+/* --- SIDEBAR --- */
+.sidebar {
+  background-color: #f7f8f9; 
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease; /* Hiệu ứng trượt mượt mà */
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Trạng thái mở */
+.sidebar.open {
+  width: 240px;
+}
+
+/* Trạng thái đóng */
+.sidebar.closed {
+  width: 60px; /* Thu nhỏ lại chỉ hiện icon */
+}
+
+/* Nút Toggle (Kéo ra/vào) */
+.sidebar-toggle {
+  position: absolute;
+  top: 20px;
+  right: -12px;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  color: #555;
+  font-size: 12px;
+}
+.sidebar-toggle:hover {
+  background-color: #7b68ee;
+  color: white;
+  border-color: #7b68ee;
+}
+
+/* Menu Items */
+.sidebar-menu {
+  flex: 1;
+  padding: 20px 10px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #5f6368;
+  white-space: nowrap; /* Không xuống dòng khi thu nhỏ */
+  overflow: hidden;
+  transition: background 0.2s;
+  text-decoration: none; /* Bỏ gạch chân thẻ a */
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+}
+
+.menu-item:hover, .menu-item.active {
+  background-color: #e8eaed;
+  color: #202124;
+}
+
+.menu-icon {
+  min-width: 24px; /* Giữ icon cố định khi thu nhỏ */
+  font-size: 18px;
+  display: flex;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+/* Ẩn chữ khi thu nhỏ */
+.sidebar.closed .menu-text {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Footer Sidebar (User profile) */
+.sidebar-footer {
+  padding: 15px;
+  border-top: 1px solid #eee;
+}
+
+/* --- MAIN CONTENT (PHẦN BÊN PHẢI) --- */
+.main-content {
+  flex: 1; /* Chiếm hết phần còn lại */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #fff;
+}
+
+.main-header {
+  padding: 15px 30px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-scroll-area {
+  flex: 1;
+  overflow-y: auto; /* Cho phép cuộn dọc phần bảng */
+  padding: 20px;
+  background-color: #fafbfc; /* Màu nền bảng */
+}
