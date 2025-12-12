@@ -1,19 +1,16 @@
-// File: server/services/emailService.js
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// 1. Cấu hình người gửi (Lấy từ .env)
-    const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com", // Khai báo rõ host của Google
-    port: 465,              // Ép dùng cổng 465 (SSL) để tránh bị Render chặn
-    secure: true,           // Bắt buộc dùng SSL
+// Cấu hình gửi mail qua BREVO (Thay thế đoạn Gmail cũ)
+const transporter = nodemailer.createTransport({
+    host: "smtp-relay.brevo.com", // Host của Brevo (Lấy từ hình 1 của bạn)
+    port: 587,                     // Dùng cổng 587 (Render cho phép cổng này)
+    secure: false,                 // Cổng 587 dùng secure: false
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    logger: true,
-    debug: true
-    });
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS 
+    }
+});
 
 const sendWelcomeEmail = async (userEmail, userName) => {
     
