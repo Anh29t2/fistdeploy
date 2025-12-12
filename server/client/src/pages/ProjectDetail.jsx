@@ -26,9 +26,10 @@ export default function ProjectDetail({ user, onLogout }) {
   const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
 
-  const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3000' 
-    : 'https://fistdeploy.onrender.com';
+  const API_URL = 'http://localhost:3000';
+  // const API_URL = window.location.hostname === 'localhost' 
+  //   ? 'http://localhost:3000' 
+  //   : 'https://fistdeploy.onrender.com';
 
   const getToken = () => localStorage.getItem('access_token');
 

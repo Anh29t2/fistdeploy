@@ -17,9 +17,10 @@ export default function Projects({ user, onLogout }) {
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [newProjectDeadline, setNewProjectDeadline] = useState('');
 
-  const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3000' 
-    : 'https://fistdeploy.onrender.com';
+  const API_URL = 'http://localhost:3000';
+  // const API_URL = window.location.hostname === 'localhost' 
+  //   ? 'http://localhost:3000' 
+  //   : 'https://fistdeploy.onrender.com';
 
   const getToken = () => localStorage.getItem('access_token');
 

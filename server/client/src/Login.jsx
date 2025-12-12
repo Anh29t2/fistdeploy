@@ -18,7 +18,7 @@ function Login({ onLoginSuccess }) {
         return;
     }
     try {
-      const response = await fetch('https://fistdeploy.onrender.com/auth/login', {
+      const response = await fetch('http://localhost:3000/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -42,7 +42,7 @@ function Login({ onLoginSuccess }) {
   const handleForgotPassword = async () => {
     if (!forgotEmail) return toast.warning("Vui lòng nhập email!");
     try {
-        const res = await fetch('https://fistdeploy.onrender.com/auth/forgot-password', {
+        const res = await fetch('http://localhost:3000/auth/forgot-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: forgotEmail })

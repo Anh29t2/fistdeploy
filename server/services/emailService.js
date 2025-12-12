@@ -16,7 +16,7 @@ const sendWelcomeEmail = async (userEmail, userName) => {
     
     // 2. Nội dung email
     const mailOptions = {
-        from: '"My App" <no-reply@todoapp.com>',
+        from: '"My App" <quanlee2108@gmail.com>',  // Phải là email đã verify trên Brevo
         to: userEmail,
         subject: '🎉 Chào mừng bạn gia nhập My App!',
         html: `
@@ -38,10 +38,12 @@ const sendWelcomeEmail = async (userEmail, userName) => {
 
 // Hàm 2: Gửi mật khẩu mới (Khi quên mật khẩu) - MỚI THÊM
 const sendResetEmail = async (userEmail, newPassword) => {
+    console.log(`📧 [SEND_RESET_EMAIL] Bắt đầu gửi email tới: ${userEmail}`);
+    
     const mailOptions = {
-        from: '"My App" <no-reply@todoapp.com>',
+        from: '"My App" <quanlee2108@gmail.com>',
         to: userEmail,
-        subject: '🔐 Cấp lại mật khẩu mới',
+        subject: 'Cấp lại mật khẩu mới',
         html: `
             <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                 <h2 style="color: #FF5722;">Quên mật khẩu?</h2>
@@ -54,7 +56,19 @@ const sendResetEmail = async (userEmail, newPassword) => {
             </div>
         `
     };
-    await transporter.sendMail(mailOptions);
+    
+    try {
+        const result = await transporter.sendMail(mailOptions);
+        console.log(`✅ [SEND_RESET_EMAIL] Gửi thành công! Message ID: ${result.messageId}`);
+        return result;
+    } catch (error) {
+        console.error(`❌ [SEND_RESET_EMAIL] Lỗi chi tiết:`, {
+            message: error.message,
+            code: error.code,
+            response: error.response
+        });
+        throw error;
+    }
 };
 
 // ... (code cũ giữ nguyên)

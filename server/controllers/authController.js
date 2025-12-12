@@ -66,42 +66,99 @@ exports.login = async (req, res) => {
 // === HÀM MỚI: QUÊN MẬT KHẨU ===
 exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
+    console.log(`📧 [FORGOT_PASSWORD] Nhận yêu cầu từ email: ${email}`);
+    
     try {
         // 1. Kiểm tra email
         const [rows] = await connection.promise().query('SELECT * FROM users WHERE email = ?', [email]);
-        if (rows.length === 0) return res.status(404).json({ message: 'Email này chưa đăng ký tài khoản!' });
+        if (rows.length === 0) {
+            console.log(`❌ Email không tồn tại: ${email}`);
+            return res.status(404).json({ message: 'Email này chưa đăng ký tài khoản!' });
+        }
+        console.log(`✅ Tìm thấy user: ${rows[0].name}`);
 
         // 2. Tạo mật khẩu mới
         const newPassword = Math.random().toString(36).slice(-8);
+        console.log(`🔑 Tạo mật khẩu mới: ${newPassword}`);
 
         // 3. Mã hóa
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
+        console.log(`🔒 Đã hash mật khẩu`);
 
         // 4. Cập nhật DB
         await connection.promise().query('UPDATE users SET password = ? WHERE email = ?', [hashedPassword, email]);
+        console.log(`💾 Cập nhật DB thành công`);
 
-        // --- SỬA ĐOẠN NÀY ---
-        // 5. Gửi email (Dùng await để bắt buộc server đợi gửi xong)
-        console.log(`Đang bắt đầu gửi mail tới: ${email}...`); // Log để xem nó có chạy không
-        
-        try {
-            await sendResetEmail(email, newPassword);
-            console.log("✅ Gửi mail thành công!");
-        } catch (mailError) {
-            console.error("❌ Lỗi CHI TIẾT khi gửi mail:", mailError);
-            // Nếu lỗi gửi mail, báo lỗi về Client luôn để bạn biết
-            return res.status(500).json({ 
-                message: 'Đổi mật khẩu thành công nhưng KHÔNG gửi được email.',
-                error_detail: mailError.message // Quan trọng: Đọc dòng này để biết lỗi gì
-            });
-        }
+        // 5. Gửi email NGẦM (không chờ) - Improve performance
+        console.log(`📤 Bắt đầu gửi email ngầm...`);
+        sendResetEmail(email, newPassword).catch(err => {
+            console.error("❌ Lỗi gửi email reset:", err);
+        });
 
-        // Chỉ khi gửi mail thành công (hoặc không lỗi) mới chạy xuống đây
-        res.json({ message: 'Mật khẩu mới đã được gửi vào email của bạn!' });
+        // Response ngay cho client (không chờ email)
+        console.log(`✅ Response cho client`);
+        res.json({ 
+            message: 'Mật khẩu mới đã được gửi vào email của bạn! Hãy check email để lấy mật khẩu tạm thời.'
+        });
 
     } catch (error) {
-        console.error("Lỗi hệ thống:", error);
+        console.error("❌ Lỗi hệ thống:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// === HÀM MỚI: ĐỔI MẬT KHẨU ===
+exports.changePassword = async (req, res) => {
+    const userId = req.user.id;  // Lấy từ token (middleware authMiddleware)
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+    
+    console.log(`🔐 [CHANGE_PASSWORD] User ${userId} yêu cầu đổi mật khẩu`);
+    
+    try {
+        // 1. Validate input
+        if (!oldPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({ message: 'Vui lòng điền đầy đủ các trường!' });
+        }
+        
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ message: 'Mật khẩu mới và xác nhận không trùng khớp!' });
+        }
+        
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự!' });
+        }
+
+        // 2. Lấy user từ DB
+        const [rows] = await connection.promise().query('SELECT * FROM users WHERE id = ?', [userId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User không tồn tại!' });
+        }
+        
+        const user = rows[0];
+        console.log(`✅ Tìm thấy user: ${user.email}`);
+
+        // 3. So sánh mật khẩu cũ
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            console.log(`❌ Mật khẩu cũ không đúng`);
+            return res.status(400).json({ message: 'Mật khẩu cũ không đúng!' });
+        }
+        console.log(`✅ Mật khẩu cũ chính xác`);
+
+        // 4. Mã hóa mật khẩu mới
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        console.log(`🔒 Đã hash mật khẩu mới`);
+
+        // 5. Cập nhật DB
+        await connection.promise().query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+        console.log(`💾 Cập nhật mật khẩu thành công`);
+
+        res.json({ message: 'Đổi mật khẩu thành công!' });
+
+    } catch (error) {
+        console.error("❌ Lỗi hệ thống:", error);
         res.status(500).json({ error: error.message });
     }
 };

@@ -7,11 +7,13 @@ import KanbanBoard from "./components/KanbanBoard";
 import AddTaskModal from "./components/AddTaskModal";
 import EditTaskModal from "./components/EditTaskModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
+import ChangePasswordModal from "./components/ChangePasswordModal";
 
 function Home({ user, onLogout }) {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   
   // State cho Form Thêm mới
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -25,9 +27,10 @@ function Home({ user, onLogout }) {
   const [deletingTask, setDeletingTask] = useState(null);
 
   // Tự động nhận diện URL Backend (Local hoặc Render)
-  const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3000' 
-    : 'https://fistdeploy.onrender.com';
+  const API_URL = 'http://localhost:3000';
+  // const API_URL = window.location.hostname === 'localhost' 
+  //   ? 'http://localhost:3000' 
+  //   : 'https://fistdeploy.onrender.com';
 
   // --- 1. HÀM HELPER TOKEN & FETCH ---
   const getToken = () => localStorage.getItem('access_token');
@@ -230,10 +233,17 @@ function Home({ user, onLogout }) {
         gap: '10px'
       }}>
         <button onClick={() => navigate('/projects')} className="btn-logout-fixed" style={{
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          background: 'linear-gradient(135deg, #f163b6ff 0%, #8b5cf6 100%)',
           marginRight: '10px'
         }}>
           📁 Dự án
+        </button>
+        <button 
+          onClick={() => setIsChangePasswordOpen(true)} 
+          className="btn-logout-fixed"
+          style={{backgroundColor: '#5cf6d0ff'}}
+        >
+          🔐 Đổi Mật Khẩu
         </button>
         <button onClick={onLogout} className="btn-logout-fixed">
           🚪 Đăng xuất
@@ -309,6 +319,12 @@ function Home({ user, onLogout }) {
         onClose={() => setDeletingTask(null)}
         onConfirm={confirmDelete}
         task={deletingTask}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        onSuccess={fetchTasks}
       />
     </>
   );
