@@ -30,9 +30,19 @@ exports.getTasks = async (req, res) => {
 
 // 2. Thêm task mới (Chuẩn chỉnh)
 exports.createTask = async (req, res) => {
-    const { user_id, project_id, title, description, priority, deadline } = req.body;
+    let { user_id, project_id, title, description, priority, deadline } = req.body;
     
     try {
+        // Xử lý deadline: nếu trống hoặc null thì lưu null, nếu không thì chuẩn hóa ngày
+        if (!deadline || deadline === '') {
+            deadline = null;
+        } else {
+            // Đảm bảo deadline ở format YYYY-MM-DD
+            if (typeof deadline === 'string') {
+                deadline = deadline.split('T')[0]; // Loại bỏ phần time nếu có
+            }
+        }
+
         await connection.promise().query(
             'INSERT INTO tasks (user_id, project_id, title, description, priority, deadline) VALUES (?, ?, ?, ?, ?, ?)',
             [
@@ -41,7 +51,7 @@ exports.createTask = async (req, res) => {
                 title,
                 description || '',
                 priority || 'medium',
-                deadline || null
+                deadline
             ]
         );
         
@@ -58,9 +68,19 @@ exports.createTask = async (req, res) => {
 // 3. Cập nhật task (Chuẩn chỉnh)
 exports.updateTask = async (req, res) => {
     const { id } = req.params;
-    const { title, status, description, priority, deadline } = req.body;
+    let { title, status, description, priority, deadline } = req.body;
     
     try {
+        // Xử lý deadline: nếu trống hoặc null thì lưu null, nếu không thì chuẩn hóa ngày
+        if (!deadline || deadline === '') {
+            deadline = null;
+        } else {
+            // Đảm bảo deadline ở format YYYY-MM-DD
+            if (typeof deadline === 'string') {
+                deadline = deadline.split('T')[0]; // Loại bỏ phần time nếu có
+            }
+        }
+
         await connection.promise().query(
             `UPDATE tasks SET 
                 title = ?, 

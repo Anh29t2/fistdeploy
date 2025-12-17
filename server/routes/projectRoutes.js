@@ -8,8 +8,8 @@ router.get('/', authMiddleware, projectController.getProjects);
 router.post('/', authMiddleware, projectController.createProject);
 router.delete('/:id', authMiddleware, projectController.deleteProject);
 
-app.get('/:projectId/members', authMiddleware, projectController.getProjectMembers);
-app.post('/:projectId/members', authMiddleware, projectController.addProjectMember);
-app.delete('/:projectId/members/:userId', authMiddleware, projectController.removeProjectMember);
+router.get('/:projectId/members',authMiddleware, projectController.getProjectMembers);
+router.post('/:projectId/members',authMiddleware, projectController.addProjectMember);
+router.delete('/:projectId/members/:userId',authMiddleware, projectController.removeProjectMember);
 
 module.exports = router;

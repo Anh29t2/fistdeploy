@@ -7,6 +7,19 @@ export default function EditTaskModal({
 }) {
   if (!isOpen || !task) return null;
 
+  // Hàm chuyển đổi múi giờ thành giờ địa phương
+  const formatDate = (dateString) => {
+    if(!dateString) return '';  // Nếu không có dateString thì trả về chuỗi rỗng
+    const date = new Date(dateString);
+
+    // Lấy múi giờ hiện tại của người dùng
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -53,13 +66,13 @@ export default function EditTaskModal({
               <option value="completed">✅ Hoàn thành</option>
             </select>
           </div>
-        </div>
+        </div>  
 
         <label>Hạn chót</label>
         <input 
           type="date" 
           className="modal-input" 
-          value={task.deadline ? new Date(task.deadline).toISOString().split('T')[0] : ''} 
+          value={formatDate(task.deadline)} 
           onChange={(e) => setTask({...task, deadline: e.target.value})} 
         />
 

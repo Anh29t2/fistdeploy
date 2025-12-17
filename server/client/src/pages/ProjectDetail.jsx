@@ -6,6 +6,8 @@ import KanbanBoard from '../components/KanbanBoard';
 import AddTaskModal from '../components/AddTaskModal';
 import EditTaskModal from '../components/EditTaskModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import MembersModal from '../components/MembersModal';
+import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers } from "react-icons/fa";
 
 export default function ProjectDetail({ user, onLogout }) {
   const { projectId } = useParams();
@@ -14,347 +16,300 @@ export default function ProjectDetail({ user, onLogout }) {
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  
-  // State cho Form Thêm mới
+  const [loading, setLoading] = useState(true);
+
+  // State Modals
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDeadline, setNewTaskDeadline] = useState("");
 
-  // State cho Modal Sửa & Xóa
   const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
   const API_URL = 'http://localhost:3000';
-  // const API_URL = window.location.hostname === 'localhost' 
-  //   ? 'http://localhost:3000' 
-  //   : 'https://fistdeploy.onrender.com';
 
   const getToken = () => localStorage.getItem('access_token');
 
   const authenticatedFetch = async (url, options = {}) => {
     const token = getToken();
-    
-    if (!token) {
-        onLogout();
-        return null;
-    }
-
-    const headers = {
-        'Authorization': `Bearer ${token}`,
-        ...options.headers
-    };
+    if (!token) { onLogout(); return null; }
+    const headers = { 'Authorization': `Bearer ${token}`, ...options.headers };
 
     try {
         const response = await fetch(url, { ...options, headers });
-
         if (response.status === 401 || response.status === 403) {
-            toast.error("Hết phiên đăng nhập! Vui lòng đăng nhập lại.");
-            onLogout();
-            return null;
+            toast.error("Hết phiên đăng nhập!"); onLogout(); return null;
         }
-
         return response;
-    } catch (error) {
-        console.error("Lỗi mạng:", error);
-        return null;
-    }
+    } catch (error) { console.error("Lỗi mạng:", error); return null; }
   };
 
-  // Lấy thông tin project
-  const fetchProject = async () => {
-    const response = await authenticatedFetch(`${API_URL}/projects?user_id=${user.id}`);
-    if (response && response.ok) {
-      const projects = await response.json();
-      const currentProject = projects.find(p => p.id == projectId);
-      if (currentProject) {
-        setProject(currentProject);
-      } else {
-        toast.error('Không tìm thấy project!');
-        navigate('/projects');
-      }
-    } else {
-      toast.error('Lỗi tải project!');
-    }
+  // --- HÀM QUAN TRỌNG: Format ngày để giữ nguyên giá trị khi gửi đi ---
+  const formatDateLocal = (isoString) => {
+    if (!isoString) return null;
+    const date = new Date(isoString);
+    // Lấy ngày theo giờ máy tính (Local Time)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
-
-  // Lấy danh sách tasks của project
-  const fetchTasks = async () => {
-    const response = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
-    if (response && response.ok) {
-      const data = await response.json();
-      setTasks(Array.isArray(data) ? data : []);
-    }
-  };
+  // ------------------------------------------------------------------
 
   useEffect(() => {
-    // Reset state khi chuyển sang project khác
-    setTasks([]);
-    setProject(null);
-    setSearchTerm("");
-    setIsAddingTask(false);
-    setEditingTask(null);
-    setDeletingTask(null);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const projRes = await authenticatedFetch(`${API_URL}/projects?user_id=${user.id}`);
+            if (projRes && projRes.ok) {
+                const projects = await projRes.json();
+                const current = projects.find(p => p.id == projectId);
+                if (current) setProject(current);
+                else { toast.error('Dự án không tồn tại'); navigate('/projects'); return; }
+            }
 
-    // Fetch project và tasks mới
-    fetchProject();
-    fetchTasks();
+            const taskRes = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
+            if (taskRes && taskRes.ok) {
+                const data = await taskRes.json();
+                setTasks(Array.isArray(data) ? data : []);
+            }
+        } catch (error) { console.error(error); } 
+        finally { setLoading(false); }
+    };
 
-    // Socket connection
+    if (user?.id) fetchData();
+
     const socket = io(API_URL);
     socket.on('server_update_data', () => {
-      fetchTasks();
+        authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`)
+            .then(res => res.json())
+            .then(data => setTasks(Array.isArray(data) ? data : []));
     });
 
     return () => socket.disconnect();
-  }, [projectId]);
+  }, [projectId, user]);
 
-  // --- XỬ LÝ THÊM TASK ---
+
   const handleAddTask = async (e) => {
     e.preventDefault();
-    if (!newTaskTitle.trim()) {
-        toast.warning("Vui lòng nhập tên công việc!");
-        return;
-    }
-
+    if (!newTaskTitle.trim()) { toast.warning("Nhập tên công việc!"); return; }
     const response = await authenticatedFetch(`${API_URL}/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            user_id: user.id,
-            project_id: projectId,
-            title: newTaskTitle,
-            description: newTaskDescription,
-            priority: newTaskPriority,
-            deadline: newTaskDeadline
+            user_id: user.id, 
+            project_id: projectId, 
+            title: newTaskTitle, 
+            description: newTaskDescription, 
+            priority: newTaskPriority, 
+            deadline: newTaskDeadline // Form thêm mới thường đã là YYYY-MM-DD từ input date nên ok
         }),
     });
-
     if (response && response.ok) {
         toast.success("Thêm thành công!");
-        setNewTaskTitle(""); 
-        setNewTaskDescription("");
-        setNewTaskPriority("medium");
-        setNewTaskDeadline("");
-        setIsAddingTask(false);
-        fetchTasks();
-    } else {
-        const errorData = response ? await response.json() : {};
-        toast.error(errorData?.error || "Lỗi thêm việc!");
-        console.error("Error adding task:", errorData);
-    }
+        setNewTaskTitle(""); setNewTaskDescription(""); setIsAddingTask(false);
+        const tRes = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
+        const tData = await tRes.json();
+        setTasks(tData);
+    } else { toast.error("Lỗi thêm việc!"); }
   };
 
-  // --- XỬ LÝ SỬA TASK ---
-  const handleEditTask = async (e) => {
-    if (!editingTask) return;
+  const submitEditTask = async () => {
+     if (!editingTask) return;
+     
+     // Kiểm tra xem deadline là chuỗi ISO hay đã là YYYY-MM-DD
+     // Nếu người dùng chọn từ lịch -> YYYY-MM-DD -> giữ nguyên
+     // Nếu người dùng không sửa gì -> ISO string -> cần format lại
+     let deadlineToSend = editingTask.deadline;
+     if (deadlineToSend && deadlineToSend.includes('T')) {
+         deadlineToSend = formatDateLocal(deadlineToSend);
+     }
 
-    console.log('🔄 Đang cập nhật task:', editingTask);
-
-    const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            title: editingTask.title,
-            status: editingTask.status,
-            priority: editingTask.priority,
-            deadline: editingTask.deadline,
-            description: editingTask.description
+     const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+            title: editingTask.title, 
+            status: editingTask.status, 
+            priority: editingTask.priority, 
+            deadline: deadlineToSend, // <--- SỬA: Dùng biến đã xử lý
+            description: editingTask.description 
         }),
     });
-
     if (response && response.ok) {
-        const data = await response.json();
-        console.log('✅ Cập nhật thành công:', data);
-        toast.success("Cập nhật thành công!");
-        setEditingTask(null);
-        await fetchTasks(); // Refresh data ngay
-    } else {
-        const errorData = response ? await response.json() : {};
-        console.error('❌ Lỗi cập nhật:', errorData);
-        toast.error(errorData?.error || "Lỗi cập nhật!");
+        toast.success("Cập nhật thành công!"); setEditingTask(null);
+        const tRes = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
+        setTasks(await tRes.json());
     }
   };
 
-  // --- XỬ LÝ XÓA ---
   const confirmDelete = async () => {
     if (!deletingTask) return;
-
-    const response = await authenticatedFetch(`${API_URL}/tasks/${deletingTask.id}`, {
-        method: "DELETE",
-    });
-
-    if (response && response.ok) {
-        toast.success("Xóa thành công!");
-        setDeletingTask(null);
-        fetchTasks();
-    } else {
-        toast.error("Lỗi xóa!");
-    }
+    const response = await authenticatedFetch(`${API_URL}/tasks/${deletingTask.id}`, { method: "DELETE" });
+    if (response && response.ok) { toast.success("Xóa thành công!"); setDeletingTask(null); 
+        setTasks(prevTasks => prevTasks.filter(t => t.id !== deletingTask.id));
+    } else { toast.error("Lỗi xóa task!"); }
   };
 
-  // --- XỬ LÝ DRAG & DROP ---
-  // --- XỬ LÝ DRAG & DROP (Đã sửa) ---
   const handleDragEnd = async (result) => {
     const { source, destination, draggableId } = result;
-    
-    // 1. Kiểm tra điều kiện kéo thả hợp lệ
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-
-    const task = tasks.find(t => t.id == draggableId);
-    if (!task) return;
-
+    const task = tasks.find(t => t.id == draggableId); if (!task) return;
     const newStatus = destination.droppableId;
     
-    // 2. Cập nhật giao diện ngay lập tức (Optimistic Update)
-    const newTasks = tasks.map(t => 
-      t.id == draggableId ? { ...t, status: newStatus } : t
-    );
+    const newTasks = tasks.map(t => t.id == draggableId ? { ...t, status: newStatus } : t);
     setTasks(newTasks);
 
-    // 3. Gửi request lên server (Gửi FULL thông tin để tránh lỗi backend)
-    const response = await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+    await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            title: task.title,            
+            title: task.title, 
             description: task.description, 
-            priority: task.priority,      
-            deadline: task.deadline,      
-            status: newStatus // Chỉ thay đổi cái này
+            priority: task.priority, 
+            deadline: formatDateLocal(task.deadline), // <--- QUAN TRỌNG: Format lại ngày tại đây
+            status: newStatus 
         }),
     });
-
-    // 4. Hiện thông báo Toast
-    if (response && response.ok) {
-        toast.success("Đã chuyển trạng thái!", { autoClose: 1500 });
-    } else {
-        toast.error("Lỗi cập nhật! Vui lòng thử lại.");
-        fetchTasks(); // Nếu lỗi thì tải lại dữ liệu cũ để đồng bộ
-    }
   };
 
-  const filteredTasks = tasks.filter(task =>
-    task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    task.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+  const filteredTasks = tasks.filter(task => task.title.toLowerCase().includes(searchTerm.toLowerCase()));
   const columns = {
     pending: { title: "⏳ Chờ xử lý", color: "#f59e0b", items: filteredTasks.filter(t => t.status === 'pending') },
     processing: { title: "🔥 Đang làm", color: "#3b82f6", items: filteredTasks.filter(t => t.status === 'processing') },
     completed: { title: "✅ Hoàn thành", color: "#10b981", items: filteredTasks.filter(t => t.status === 'completed') }
   };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  };
-
-  if (!project) {
-    return (
-      <div style={{ textAlign: 'center', marginTop: '50px' }}>
-        <p>Đang tải project...</p>
-      </div>
-    );
-  }
+  const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "";
 
   return (
     <>
-      {/* Navigation Buttons */}
-      <div style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        zIndex: 999,
-        display: 'flex',
-        gap: '10px'
-      }}>
-        <button onClick={() => navigate('/projects')} className="btn-logout-fixed" style={{
-          background: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)',
-          marginRight: '10px'
-        }}>
-          ← Quay lại
-        </button>
-        <button onClick={onLogout} className="btn-logout-fixed">
-          🚪 Đăng xuất
-        </button>
-      </div>
-
-      {/* Container Chính */}
-      <div className="dashboard-container">
+      <div className="app-container">
         
-        {/* Header */}
-        <div className="home-header">
-            <div>
-                <h2>{project.name}</h2>
-                <p style={{color: '#6b7280', margin:'5px 0 0'}}>Xin chào, <b>{user.name}</b> 👋</p>
-                {project.deadline && (
-                  <p style={{color: '#d97706', margin:'5px 0 0', fontSize: '14px'}}>⏰ Hạn chót: {formatDate(project.deadline)}</p>
-                )}
+        <aside className="sidebar">
+            <div className="sidebar-header">
+               <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                  <div style={{width:'32px', height:'32px', background:'#6a11cb', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold'}}>A</div>
+                  <div style={{fontWeight:'bold', fontSize:'15px', color:'#333'}}>ABCD Board</div>
+               </div>
             </div>
-        </div>
+            <nav className="sidebar-menu">
+                <div className="menu-item" onClick={() => navigate('/home')}>
+                    <span className="menu-icon"><FaHome size={18} /></span>
+                    <span className="menu-text">Trang chủ</span>
+                </div>
+                <div className="menu-item active">
+                    <span className="menu-icon"><FaProjectDiagram size={18} /></span>
+                    <span className="menu-text">Dự án</span>
+                </div>
+            </nav>
+            <div className="sidebar-footer">
+                <div className="menu-item" onClick={onLogout} style={{color: '#e05d5d'}}>
+                    <span className="menu-icon"><FaSignOutAlt size={18} /></span>
+                    <span className="menu-text">Đăng xuất</span>
+                </div>
+            </div>
+        </aside>
 
-        {/* Thanh điều khiển */}
-        <div className="kanban-controls">
-          <input
-            type="text"
-            placeholder="🔍 Tìm công việc..."
-            className="control-input"
-            style={{ flex: 1, minWidth: '200px' }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button
-            className="btn-add"
-            onClick={() => setIsAddingTask(true)}
-          >
-            ➕ Thêm Việc Mới
-          </button>
-        </div>
+        <main className="main-content">
+            {loading || !project ? (
+                <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#666'}}>
+                    <div className="loading-spinner" style={{width: '30px', height: '30px', border: '3px solid #eee', borderTop: '3px solid #6a11cb', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '10px'}}></div>
+                    <p>Đang tải dữ liệu...</p>
+                    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                </div>
+            ) : (
+                <>
+                    <header className="main-header">
+                        <div>
+                           <h2 style={{margin:0, fontSize: '24px', color: '#172b4d'}}>{project.name}</h2>
+                           <small style={{color:'#6b778c'}}>{project.description || "Không có mô tả"}</small>
+                        </div>
+                        
+                        <div style={{display:'flex', gap:'10px'}}>
+                           <div style={{position:'relative'}}>
+                                <FaSearch style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
+                                <input 
+                                    type="text" placeholder="Tìm việc..." className="control-input"
+                                    style={{padding: '8px 12px 8px 35px', fontSize: '14px', width: '200px'}}
+                                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
+                                />
+                           </div>
+                           <button className="btn-add" onClick={() => setIsAddingTask(true)} style={{padding: '8px 16px', fontSize: '14px', display:'flex', alignItems:'center', gap:'5px'}}>
+                               <FaPlus /> Tạo mới
+                           </button>
+                           <button className="btn-member" onClick={() => setIsMembersModalOpen(true)} style={{padding: '8px 16px', fontSize: '14px'}}>
+                               <FaUsers /> Thành viên
+                           </button>
+                        </div>
+                    </header>
 
-        {/* Kanban Board */}
-        <KanbanBoard
-          columns={columns}
-          onDragEnd={handleDragEnd}
-          onTaskClick={setEditingTask}
-          onDeleteClick={setDeletingTask}
-          formatDate={formatDate}
-          isDraggable={true}
-        />
+                    <div className="content-scroll-area">
+                        <KanbanBoard
+                          columns={columns} onDragEnd={handleDragEnd} onTaskClick={setEditingTask}
+                          onDeleteClick={setDeletingTask} formatDate={formatDate} isDraggable={true}
+                        />
+                    </div>
+                </>
+            )}
+        </main>
+
+        <aside className="right-sidebar">
+            {!loading && project && (
+                <>
+                    <div>
+                        <div className="right-section-title">THÔNG TIN</div>
+                        <div className="info-card">
+                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px'}}>
+                                <FaClock style={{color:'#0052cc'}}/> 
+                                <span style={{fontSize:'13px', fontWeight:'600'}}>Hạn chót:</span>
+                            </div>
+                            <div style={{fontSize:'14px', color:'#333', marginLeft:'24px'}}>
+                                {formatDate(project.deadline) || "Chưa đặt lịch"}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="right-section-title" style={{marginTop:'20px'}}>THỐNG KÊ</div>
+                        <div className="info-card">
+                            <div className="stats-row">
+                                <span className="stats-label">Tổng task</span>
+                                <span className="stats-value">{filteredTasks.length}</span>
+                            </div>
+                            <div className="progress-bar-mini">
+                                <div className="progress-fill" style={{width: filteredTasks.length > 0 ? (columns.completed.items.length / filteredTasks.length * 100) + '%' : '0%'}}></div>
+                            </div>
+                            <p style={{fontSize:'12px', color:'#666', marginTop:'10px'}}>
+                                Hoàn thành: {columns.completed.items.length}/{filteredTasks.length}
+                            </p>
+                        </div>
+                    </div>
+                </>
+            )}
+        </aside>
+
       </div>
 
-      {/* Add Task Modal */}
       <AddTaskModal
-        isOpen={isAddingTask}
-        onClose={() => setIsAddingTask(false)}
-        onSubmit={handleAddTask}
-        title={newTaskTitle}
-        setTitle={setNewTaskTitle}
-        description={newTaskDescription}
-        setDescription={setNewTaskDescription}
-        priority={newTaskPriority}
-        setPriority={setNewTaskPriority}
-        deadline={newTaskDeadline}
-        setDeadline={setNewTaskDeadline}
+        isOpen={isAddingTask} onClose={() => setIsAddingTask(false)} onSubmit={handleAddTask}
+        title={newTaskTitle} setTitle={setNewTaskTitle} description={newTaskDescription} setDescription={setNewTaskDescription}
+        priority={newTaskPriority} setPriority={setNewTaskPriority} deadline={newTaskDeadline} setDeadline={setNewTaskDeadline}
       />
 
-      {/* Edit Task Modal */}
       <EditTaskModal
-        isOpen={!!editingTask}
-        onClose={() => setEditingTask(null)}
-        onSubmit={handleEditTask}
-        task={editingTask}
-        setTask={setEditingTask}
+        isOpen={!!editingTask} onClose={() => setEditingTask(null)} onSubmit={submitEditTask}
+        task={editingTask} setTask={setEditingTask}
       />
 
-      {/* Delete Confirm Modal */}
       <DeleteConfirmModal
-        isOpen={!!deletingTask}
-        onClose={() => setDeletingTask(null)}
-        onConfirm={confirmDelete}
-        taskName={deletingTask?.title || ""}
+        isOpen={!!deletingTask} onClose={() => setDeletingTask(null)} onConfirm={confirmDelete}
+        task={deletingTask}
+      />
+
+      <MembersModal
+        isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)}
+        projectId={projectId} API_URL={API_URL}
       />
     </>
   );
