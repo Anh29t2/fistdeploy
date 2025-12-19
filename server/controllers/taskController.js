@@ -5,21 +5,36 @@ exports.getTasks = async (req, res) => {
     const { user_id, project_id } = req.query; 
 
     try {
-        let sql = `SELECT 
-                    t.*, 
-                    p.name as project_name
-                   FROM tasks t
-                   LEFT JOIN projects p ON t.project_id = p.id
-                   WHERE t.user_id = ?`;
-        let params = [user_id];
+        let sql = '';
+        let params = [];
 
-        // Nếu có project_id gửi lên thì thêm điều kiện lọc
-        if (project_id) {
-            sql += ' AND t.project_id = ?';
-            params.push(project_id);
+        if (project_id){
+            // TH1: Lấy tất cả công việc trong dự án
+            sql = `
+                SELECT t.*, p.name as project_name 
+                FROM tasks t
+                JOIN projects p ON t.project_id = p.id
+                WHERE t.project_id = ? 
+                ORDER BY t.created_at DESC
+            `;
+            params = [project_id];
+        } else if(user_id){
+            // TH2: Lấy tất cả công việc của user (trang chủ  + cả công việc trong dự án mà user tham gia)
+            sql = `
+                SELECT DISTINCT t.*, p.name as project_name
+                FROM tasks t
+                LEFT JOIN project_members pm ON t.project_id = pm.project_id
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE 
+                    t.user_id = ?          
+                    OR 
+                    pm.user_id = ?         
+                ORDER BY t.created_at DESC
+            `;
+            params = [user_id, user_id];
+        } else {
+            return res.json([]); 
         }
-
-        sql += ' ORDER BY t.created_at DESC';
 
         const [rows] = await connection.promise().query(sql, params);
         res.json(rows);
@@ -112,6 +127,6 @@ exports.deleteTask = async (req, res) => {
 
         res.json({ message: 'Xóa thành công!' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message }); 
     }
 };

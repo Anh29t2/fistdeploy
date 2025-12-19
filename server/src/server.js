@@ -5,6 +5,7 @@ const { Server } = require("socket.io");
 const authRouters = require('../routes/authRoutes.js');
 const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
 const projectRouters = require('../routes/projectRoutes.js')
+const messageRoutes = require('../routes/messageRoutes.js');
 
 require('dotenv').config();
 
@@ -21,6 +22,7 @@ const connection = require('../config/db.js');
 app.use('/tasks', taskRoutes);
 app.use('/auth',authRouters);
 app.use('/projects',projectRouters);
+app.use('/messages', messageRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {

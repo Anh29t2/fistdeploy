@@ -4,12 +4,21 @@ const connection = require('../config/db');
 exports.getProjects = async (req, res) => {
     const { user_id } = req.query;
     try {
-        const [rows] = await connection.promise().query(
-            'SELECT * FROM projects WHERE owner_id = ? ORDER BY created_at DESC',
-            [user_id]
-        );
+       const sql = `
+            SELECT DISTINCT p.*,
+            CASE 
+                WHEN p.owner_id = ? THEN 'owner' 
+                ELSE pm.role 
+            END as my_role
+            FROM projects p
+            LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_id = ?
+            WHERE p.owner_id = ? OR pm.user_id = ?
+            ORDER BY p.created_at DESC
+        `;
+        const [rows] = await connection.promise().query(sql, [user_id, user_id, user_id, user_id]);
         res.json(rows);
     } catch (error) {
+        console.log("Loi getProjects:", error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -28,13 +37,24 @@ exports.createProject = async (req, res) => {
     }
 };
 
-// 3. Xóa dự án (Cẩn thận: Xóa dự án là xóa hết Task bên trong nhờ ON DELETE CASCADE)
+// 3. Xóa dự án (xóa toàn bộ tasks bên trong)
 exports.deleteProject = async (req, res) => {
     const { id } = req.params;
+    const { user_id } = req.body;
     try {
+        // Bước 1: Kiểm tra xem dự án này có phải của user_id này không
+        const [projects] = await connection.promise().query(
+            'SELECT id FROM projects WHERE id = ? AND owner_id = ?', 
+            [id, user_id]
+        );
+        if (projects.length === 0) {
+            return res.status(403).json({ message: 'Bạn không có quyền xóa dự án này hoặc dự án không tồn tại!' });
+        }
+        // Bước 2: Nếu đúng là Owner thì mới xóa
         await connection.promise().query('DELETE FROM projects WHERE id = ?', [id]);
         res.json({ message: 'Đã xóa dự án và toàn bộ công việc bên trong!' });
     } catch (error) {
+        console.log("Lỗi khi xóa dự án",error);
         res.status(500).json({ error: error.message });
     }
 };

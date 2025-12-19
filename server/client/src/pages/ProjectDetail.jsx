@@ -7,6 +7,7 @@ import AddTaskModal from '../components/AddTaskModal';
 import EditTaskModal from '../components/EditTaskModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import MembersModal from '../components/MembersModal';
+import ChatWidget from '../components/ChatWidget';
 import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers } from "react-icons/fa";
 
 export default function ProjectDetail({ user, onLogout }) {
@@ -51,18 +52,17 @@ export default function ProjectDetail({ user, onLogout }) {
   const formatDateLocal = (isoString) => {
     if (!isoString) return null;
     const date = new Date(isoString);
-    // Lấy ngày theo giờ máy tính (Local Time)
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
-  // ------------------------------------------------------------------
 
   useEffect(() => {
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Lấy thông tin dự án
             const projRes = await authenticatedFetch(`${API_URL}/projects?user_id=${user.id}`);
             if (projRes && projRes.ok) {
                 const projects = await projRes.json();
@@ -71,7 +71,9 @@ export default function ProjectDetail({ user, onLogout }) {
                 else { toast.error('Dự án không tồn tại'); navigate('/projects'); return; }
             }
 
-            const taskRes = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
+            // --- SỬA QUAN TRỌNG: Chỉ dùng project_id để lấy toàn bộ task trong dự án ---
+            const taskRes = await authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`);
+            // ---------------------------------------------------------------------------
             if (taskRes && taskRes.ok) {
                 const data = await taskRes.json();
                 setTasks(Array.isArray(data) ? data : []);
@@ -84,7 +86,8 @@ export default function ProjectDetail({ user, onLogout }) {
 
     const socket = io(API_URL);
     socket.on('server_update_data', () => {
-        authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`)
+        // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
+        authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`)
             .then(res => res.json())
             .then(data => setTasks(Array.isArray(data) ? data : []));
     });
@@ -104,13 +107,14 @@ export default function ProjectDetail({ user, onLogout }) {
             title: newTaskTitle, 
             description: newTaskDescription, 
             priority: newTaskPriority, 
-            deadline: newTaskDeadline // Form thêm mới thường đã là YYYY-MM-DD từ input date nên ok
+            deadline: newTaskDeadline 
         }),
     });
     if (response && response.ok) {
         toast.success("Thêm thành công!");
         setNewTaskTitle(""); setNewTaskDescription(""); setIsAddingTask(false);
-        const tRes = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
+        // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
+        const tRes = await authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`);
         const tData = await tRes.json();
         setTasks(tData);
     } else { toast.error("Lỗi thêm việc!"); }
@@ -119,9 +123,6 @@ export default function ProjectDetail({ user, onLogout }) {
   const submitEditTask = async () => {
      if (!editingTask) return;
      
-     // Kiểm tra xem deadline là chuỗi ISO hay đã là YYYY-MM-DD
-     // Nếu người dùng chọn từ lịch -> YYYY-MM-DD -> giữ nguyên
-     // Nếu người dùng không sửa gì -> ISO string -> cần format lại
      let deadlineToSend = editingTask.deadline;
      if (deadlineToSend && deadlineToSend.includes('T')) {
          deadlineToSend = formatDateLocal(deadlineToSend);
@@ -133,13 +134,14 @@ export default function ProjectDetail({ user, onLogout }) {
             title: editingTask.title, 
             status: editingTask.status, 
             priority: editingTask.priority, 
-            deadline: deadlineToSend, // <--- SỬA: Dùng biến đã xử lý
+            deadline: deadlineToSend, 
             description: editingTask.description 
         }),
     });
     if (response && response.ok) {
         toast.success("Cập nhật thành công!"); setEditingTask(null);
-        const tRes = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}&project_id=${projectId}`);
+        // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
+        const tRes = await authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`);
         setTasks(await tRes.json());
     }
   };
@@ -154,24 +156,49 @@ export default function ProjectDetail({ user, onLogout }) {
 
   const handleDragEnd = async (result) => {
     const { source, destination, draggableId } = result;
+    
+    // 1. Các kiểm tra cơ bản (giữ nguyên)
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    const task = tasks.find(t => t.id == draggableId); if (!task) return;
+    
+    const task = tasks.find(t => t.id == draggableId); 
+    if (!task) return;
+    
     const newStatus = destination.droppableId;
     
+    // 2. Cập nhật giao diện ngay lập tức (Optimistic Update)
     const newTasks = tasks.map(t => t.id == draggableId ? { ...t, status: newStatus } : t);
     setTasks(newTasks);
 
-    await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
+    // 3. Gọi API cập nhật
+    const response = await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
+        method: "PUT", 
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
             title: task.title, 
             description: task.description, 
             priority: task.priority, 
-            deadline: formatDateLocal(task.deadline), // <--- QUAN TRỌNG: Format lại ngày tại đây
+            deadline: formatDateLocal(task.deadline), 
             status: newStatus 
         }),
     });
+
+    // 4. --- THÊM ĐOẠN NÀY: Hiển thị Toast ---
+    if (response && response.ok) {
+        // Tùy chỉnh thông báo cho thân thiện hơn
+        let statusName = "";
+        switch(newStatus) {
+            case 'pending': statusName = "Chờ xử lý"; break;
+            case 'processing': statusName = "Đang làm"; break;
+            case 'completed': statusName = "Hoàn thành"; break;
+            default: statusName = newStatus;
+        }
+        toast.success(`Đã chuyển sang: ${statusName}`);
+    } else {
+        // Nếu lỗi thì báo lỗi và (tuỳ chọn) có thể hoàn tác lại giao diện cũ
+        toast.error("Lỗi khi cập nhật trạng thái!");
+        // setTasks(tasks); // Nếu muốn chặt chẽ thì bỏ comment dòng này để revert lại vị trí cũ
+    }
   };
 
   const filteredTasks = tasks.filter(task => task.title.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -290,6 +317,12 @@ export default function ProjectDetail({ user, onLogout }) {
         </aside>
 
       </div>
+      <ChatWidget 
+          user={user} 
+          projectId={projectId} 
+          API_URL={API_URL} 
+      />
+      
 
       <AddTaskModal
         isOpen={isAddingTask} onClose={() => setIsAddingTask(false)} onSubmit={handleAddTask}

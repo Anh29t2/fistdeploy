@@ -1,6 +1,7 @@
 import React from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { FaTrashAlt } from "react-icons/fa"; // 1. Import Icon thùng rác
+import { FaTrashAlt } from "react-icons/fa"; 
+import { useNavigate } from 'react-router-dom';
 
 export default function KanbanBoard({ 
   columns, 
@@ -10,6 +11,7 @@ export default function KanbanBoard({
   formatDate,
   isDraggable = true
 }) {
+  const navigate = useNavigate();
   return (
     <DragDropContext onDragEnd={isDraggable ? onDragEnd : () => {}}>
       <div className="kanban-board">
@@ -48,31 +50,57 @@ export default function KanbanBoard({
                           ...provided.draggableProps.style, 
                           borderLeft: `4px solid ${col.color}`, 
                           opacity: snapshot.isDragging ? 1 : 1,
-                          position: 'relative' // Quan trọng để nút xóa nằm đè lên góc
+                          position: 'relative' // Để nút xóa nằm đúng vị trí
                         }}
                       >
-                        {/* 2. Nút Xóa (Hình thùng rác) */}
-                        <button 
-                          className="btn-delete-mini" 
-                          onClick={(e) => { e.stopPropagation();
-                            if(onDeleteClick) onDeleteClick(task); }}
-                          title="Xóa công việc"
-                        >
-                          <FaTrashAlt size={15} />
-                        </button>
+                        {/* 1. HIỂN THỊ NGUỒN GỐC TASK (Mới thêm) */}
+                        <div style={{marginBottom: '8px', fontSize: '11px', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                          {task.project_name ? (
+                              <span 
+                                  onClick={(e) => {
+                                      e.stopPropagation(); // 1. Chặn click xuyên qua thẻ cha (để k mở modal edit)
+                                      navigate(`/projects/${task.project_id}`); // 2. Chuyển hướng sang dự án
+                                  }}
+                                  style={{
+                                      color: '#2563eb', 
+                                      background: '#dbeafe', 
+                                      padding: '2px 6px', 
+                                      borderRadius: '4px',
+                                      cursor: 'pointer', // 3. Thêm con trỏ tay để biết là bấm được
+                                      transition: '0.2s'
+                                  }}
+                                  onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'} // Hiệu ứng hover nhẹ
+                                  onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                              >
+                                  📁 {task.project_name}
+                              </span>
+                            ) : (
+                                <span style={{color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: '4px'}}>
+                                    👤 Cá nhân
+                                </span>
+                            )}
 
-                        {/* Thông tin Task */}
-                        <div className="task-meta">
+                            {/* Nút Xóa nằm ở góc phải */}
+                            <button 
+                              className="btn-delete-mini" 
+                              onClick={(e) => { e.stopPropagation(); if(onDeleteClick) onDeleteClick(task); }}
+                              title="Xóa công việc"
+                            >
+                              <FaTrashAlt size={15} />
+                            </button>
+                        </div>
+
+                        {/* 2. Tiêu đề task */}
+                        <div className="task-title" style={{ fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+                            {task.title}
+                        </div>
+
+                        {/* 3. Thông tin phụ (Priority & Deadline) */}
+                        <div className="task-meta" style={{display:'flex', gap:'8px', fontSize:'12px', color:'#6b7280'}}>
                           <span className={`badge badge-${task.priority || 'medium'}`}>
                             {task.priority === 'high' ? 'Cao' : task.priority === 'low' ? 'Thấp' : 'TB'}
                           </span>
-                          {task.deadline && <span className="task-date">📅 {formatDate(task.deadline)}</span>}
-                          {task.project_name && <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>📁 {task.project_name}</span>}
-                        </div>
-                        
-                        {/* Tiêu đề task (Thêm padding phải để không bị dính vào nút xóa) */}
-                        <div className="task-content" style={{ marginTop: '8px', paddingRight: '25px' }}>
-                            {task.title}
+                          {task.deadline && <span>📅 {formatDate(task.deadline)}</span>}
                         </div>
                         
                       </div>
