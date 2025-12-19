@@ -11,7 +11,7 @@ function Login({ onLoginSuccess }) {
   const [forgotEmail, setForgotEmail] = useState("");
 
   // Xử lý Đăng nhập
-  const handleLogin = async (e) => {
+ const handleLogin = async (e) => {
     e.preventDefault();
     if(!email || !password) {
         toast.warning("Vui lòng nhập đầy đủ thông tin!");
@@ -27,16 +27,24 @@ function Login({ onLoginSuccess }) {
       
       if (response.ok) {
         toast.success("🎉 Đăng nhập thành công!");
-        // Lưu token vào localStorage (nếu có)
+        
+        // 1. Lưu Token
         if (data.token) localStorage.setItem('access_token', data.token);
+
+        // 2. ---> THÊM DÒNG QUAN TRỌNG NÀY <---
+        // Lưu thông tin User vào máy để các trang khác (như MembersModal) biết bạn là ai
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // 3. Cập nhật state (nếu có)
         onLoginSuccess(data.user); 
       } else {
         toast.error("❌ " + (data.message || data.error));
       }
     } catch (error) {
+      console.error(error); // Nên log lỗi ra xem cho dễ
       toast.error("Lỗi kết nối server!");
     }
-  };
+};
 
   // Xử lý Gửi yêu cầu quên mật khẩu
   const handleForgotPassword = async () => {

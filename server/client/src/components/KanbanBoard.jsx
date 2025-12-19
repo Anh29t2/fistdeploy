@@ -54,7 +54,7 @@ export default function KanbanBoard({
                         }}
                       >
                         {/* 1. HIỂN THỊ NGUỒN GỐC TASK (Mới thêm) */}
-                        <div style={{marginBottom: '8px', fontSize: '11px', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <div style={{marginBottom: '8px', fontSize: '12px', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                           {task.project_name ? (
                               <span 
                                   onClick={(e) => {
@@ -72,11 +72,11 @@ export default function KanbanBoard({
                                   onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'} // Hiệu ứng hover nhẹ
                                   onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
                               >
-                                  📁 {task.project_name}
+                                   {task.project_name}
                               </span>
                             ) : (
                                 <span style={{color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: '4px'}}>
-                                    👤 Cá nhân
+                                     Cá nhân
                                 </span>
                             )}
 

@@ -62,15 +62,24 @@ exports.deleteProject = async (req, res) => {
 exports.getProjectMembers = async (req, res) => {
     const { projectId } = req.params;
     try {
+        // --- LOGIC MỚI: Dùng UNION để gộp Owner và Member ---
         const sql = `
-            SELECT u.id, u.name, u.email, pm.role 
-            FROM project_members pm
-            JOIN users u ON pm.user_id = u.id
-            WHERE pm.project_id = ?
+            (SELECT u.id, u.name, u.email, 'owner' as role 
+             FROM projects p 
+             JOIN users u ON p.owner_id = u.id 
+             WHERE p.id = ?)
+            UNION
+            (SELECT u.id, u.name, u.email, pm.role 
+             FROM project_members pm 
+             JOIN users u ON pm.user_id = u.id 
+             WHERE pm.project_id = ?)
         `;
-        const [rows] = await connection.promise().query(sql, [projectId]);
+        
+        const [rows] = await connection.promise().query(sql, [projectId, projectId]);
+        
         res.json(rows);
     } catch (error) {
+        console.error("Lỗi lấy thành viên:", error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -79,13 +88,11 @@ exports.addProjectMember = async (req, res) => {
     const { projectId } = req.params;
     const { email } = req.body;
     try {
-        // B1: Tìm xem email này có tồn tại trong hệ thống không
         const [users] = await connection.promise().query('SELECT id FROM users WHERE email = ?', [email]);
         if (users.length === 0) {
-            return res.status(404).json({ message: 'Email này chưa đăng ký tài khoản hệ thống!' });
+            return res.status(404).json({ message: 'Email này chưa đăng ký tài khoản!' });
         }
         const userToAdd = users[0];
-        // B2: Thêm vào dự án
         await connection.promise().query(
             'INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)',
             [projectId, userToAdd.id, 'member']
@@ -98,15 +105,90 @@ exports.addProjectMember = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
-exports.removeProjectMember = async (req, res) => {
-    const { projectId, userId } = req.params;
+
+exports.updateMemberRole = async (req, res) => {
+    const { projectId, memberId } = req.params; 
+    const { newRole } = req.body; 
+    const user_id = req.user.id; // Lấy ID người đang thao tác từ Token
+
     try {
-        const result = await connection.promise().query(
+        // Check quyền Owner
+        const [projects] = await connection.promise().query(
+            'SELECT id FROM projects WHERE id = ? AND owner_id = ?',
+            [projectId, user_id]
+        );
+
+        if (projects.length === 0) {
+            return res.status(403).json({ message: 'Bạn không phải Owner, không có quyền đổi role!' });
+        }
+
+        if (parseInt(memberId) === user_id) {
+             return res.status(400).json({ message: 'Owner không thể tự thay đổi quyền của mình!' });
+        }
+        
+        // Thực hiện Update
+        const [result] = await connection.promise().query(
+            'UPDATE project_members SET role = ? WHERE project_id = ? and user_id = ?',
+            [newRole, projectId, memberId]
+        );
+
+        // if (result.affectedRows === 0) {
+        //     return res.status(404).json({ message: "Không tìm thấy thành viên để cập nhật (Sai ID hoặc chưa vào dự án)" });
+        // }
+        
+        const io = req.app.get('socketio');
+        if (io) {
+            // Phát sự kiện: "Dự án X vừa có thay đổi thành viên"
+            io.emit('server_update_member_role', { 
+                projectId: projectId, 
+                memberId: memberId, 
+                newRole: newRole 
+            });
+        }
+
+        res.json({ message: 'Cập nhật vai trò thành viên thành công!' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.removeProjectMember = async (req, res) => {
+    const { projectId, userId } = req.params; // userId: ID của người bị xóa
+    const requesterId = req.user.id;          // requesterId: ID của người đang thực hiện lệnh (Lấy từ Token)
+
+    try {
+        // Kiểm tra xem người đang yêu cầu xóa (requesterId) CÓ PHẢI LÀ OWNER của dự án này không?
+        const [projects] = await connection.promise().query(
+            'SELECT id FROM projects WHERE id = ? AND owner_id = ?',
+            [projectId, requesterId]
+        );
+
+        // Nếu không tìm thấy dự án nào mà người này là chủ -> Từ chối ngay
+        if (projects.length === 0) {
+            return res.status(403).json({ message: 'Bạn không phải Owner, không có quyền xóa thành viên!' });
+        }
+        // ------------------------------------------
+
+        // Nếu đúng là Owner thì mới cho xóa
+        const [result] = await connection.promise().query(
             'DELETE FROM project_members WHERE project_id = ? AND user_id = ?',
             [projectId, userId]
-        )
+        );
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Thành viên không tồn tại trong dự án!' });
+        }
+
+        const io = req.app.get('socketio');
+        if (io) {
+            io.emit('server_update_member_role', { 
+                projectId: projectId, 
+                forceReload: true 
+            });
+        }
+
         res.json({ message: 'Đã xóa thành viên khỏi dự án!' });
-    }catch (error) {
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
