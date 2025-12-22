@@ -31,7 +31,7 @@ export default function MembersModal({
     const fetchMembers = async () => {
         try {
             // Thêm timestamp để tránh cache trình duyệt
-            const res = await authenticatedFetch(`${API_URL}/projects/${projectId}/members?t=${new Date().getTime()}`);
+            const res = await authenticatedFetch(`${API_URL}/api/projects/${projectId}/members?t=${new Date().getTime()}`);
             const data = await res.json();
             if(Array.isArray(data)) setMembers(data);
         } catch(err){
@@ -70,7 +70,7 @@ export default function MembersModal({
             return;
         }
 
-        const res = await authenticatedFetch(`${API_URL}/projects/${projectId}/members`, {
+        const res = await authenticatedFetch(`${API_URL}/api/projects/${projectId}/members`, {
             method: 'POST',
             body: JSON.stringify({ email: inviteEmail })
         });
@@ -91,7 +91,7 @@ export default function MembersModal({
         ));
 
         try {
-            const res = await authenticatedFetch(`${API_URL}/projects/${projectId}/members/${memberId}`, {
+            const res = await authenticatedFetch(`${API_URL}/api/projects/${projectId}/members/${memberId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ newRole: newRole }) 
             });
@@ -115,7 +115,7 @@ export default function MembersModal({
 
     const confirmRemove = async () => {
         if(!memberToRemove) return;
-        const res = await authenticatedFetch(`${API_URL}/projects/${projectId}/members/${memberToRemove.id}`, {
+        const res = await authenticatedFetch(`${API_URL}/api/projects/${projectId}/members/${memberToRemove.id}`, {
             method: 'DELETE'
         });
         if(res.ok) {

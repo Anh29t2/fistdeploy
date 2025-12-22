@@ -63,7 +63,7 @@ export default function ProjectDetail({ user, onLogout }) {
         setLoading(true);
         try {
             // Lấy thông tin dự án
-            const projRes = await authenticatedFetch(`${API_URL}/projects?user_id=${user.id}`);
+            const projRes = await authenticatedFetch(`${API_URL}/api/projects?user_id=${user.id}`);
             if (projRes && projRes.ok) {
                 const projects = await projRes.json();
                 const current = projects.find(p => p.id == projectId);
@@ -72,7 +72,7 @@ export default function ProjectDetail({ user, onLogout }) {
             }
 
             // --- SỬA QUAN TRỌNG: Chỉ dùng project_id để lấy toàn bộ task trong dự án ---
-            const taskRes = await authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`);
+            const taskRes = await authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`);
             // ---------------------------------------------------------------------------
             if (taskRes && taskRes.ok) {
                 const data = await taskRes.json();
@@ -86,8 +86,7 @@ export default function ProjectDetail({ user, onLogout }) {
 
     const socket = io(API_URL);
     socket.on('server_update_data', () => {
-        // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
-        authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`)
+        authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`)
             .then(res => res.json())
             .then(data => setTasks(Array.isArray(data) ? data : []));
     });
@@ -99,7 +98,7 @@ export default function ProjectDetail({ user, onLogout }) {
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) { toast.warning("Nhập tên công việc!"); return; }
-    const response = await authenticatedFetch(`${API_URL}/tasks`, {
+    const response = await authenticatedFetch(`${API_URL}/api/tasks`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
             user_id: user.id, 
@@ -114,7 +113,7 @@ export default function ProjectDetail({ user, onLogout }) {
         toast.success("Thêm thành công!");
         setNewTaskTitle(""); setNewTaskDescription(""); setIsAddingTask(false);
         // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
-        const tRes = await authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`);
+        const tRes = await authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`);
         const tData = await tRes.json();
         setTasks(tData);
     } else { toast.error("Lỗi thêm việc!"); }
@@ -128,7 +127,7 @@ export default function ProjectDetail({ user, onLogout }) {
          deadlineToSend = formatDateLocal(deadlineToSend);
      }
 
-     const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
+     const response = await authenticatedFetch(`${API_URL}/api/tasks/${editingTask.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
             title: editingTask.title, 
@@ -141,14 +140,14 @@ export default function ProjectDetail({ user, onLogout }) {
     if (response && response.ok) {
         toast.success("Cập nhật thành công!"); setEditingTask(null);
         // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
-        const tRes = await authenticatedFetch(`${API_URL}/tasks?project_id=${projectId}`);
+        const tRes = await authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`);
         setTasks(await tRes.json());
     }
   };
 
   const confirmDelete = async () => {
     if (!deletingTask) return;
-    const response = await authenticatedFetch(`${API_URL}/tasks/${deletingTask.id}`, { method: "DELETE" });
+    const response = await authenticatedFetch(`${API_URL}/api/tasks/${deletingTask.id}`, { method: "DELETE" });
     if (response && response.ok) { toast.success("Xóa thành công!"); setDeletingTask(null); 
         setTasks(prevTasks => prevTasks.filter(t => t.id !== deletingTask.id));
     } else { toast.error("Lỗi xóa task!"); }
@@ -171,7 +170,7 @@ export default function ProjectDetail({ user, onLogout }) {
     setTasks(newTasks);
 
     // 3. Gọi API cập nhật
-    const response = await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
+    const response = await authenticatedFetch(`${API_URL}/api/tasks/${draggableId}`, {
         method: "PUT", 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

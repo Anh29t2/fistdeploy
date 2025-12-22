@@ -18,7 +18,7 @@ function Login({ onLoginSuccess }) {
         return;
     }
     try {
-      const response = await fetch('http://localhost:3000/auth/login', {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -50,7 +50,7 @@ function Login({ onLoginSuccess }) {
   const handleForgotPassword = async () => {
     if (!forgotEmail) return toast.warning("Vui lòng nhập email!");
     try {
-        const res = await fetch('http://localhost:3000/auth/forgot-password', {
+        const res = await fetch('http://localhost:3000/api/auth/forgot-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: forgotEmail })

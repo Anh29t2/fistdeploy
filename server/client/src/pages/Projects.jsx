@@ -40,7 +40,7 @@ export default function Projects({ user, onLogout }) {
   // Lấy danh sách projects
   const fetchProjects = async () => {
     if (!user?.id) return;
-    const response = await authenticatedFetch(`${API_URL}/projects?user_id=${user.id}`);
+    const response = await authenticatedFetch(`${API_URL}/api/projects?user_id=${user.id}`);
     if (response && response.ok) {
       const data = await response.json();
       setProjects(Array.isArray(data) ? data : []);
@@ -59,7 +59,7 @@ export default function Projects({ user, onLogout }) {
     e.preventDefault();
     if (!newProjectName.trim()) { toast.warning('Vui lòng nhập tên project!'); return; }
 
-    const response = await authenticatedFetch(`${API_URL}/projects`, {
+    const response = await authenticatedFetch(`${API_URL}/api/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -77,7 +77,7 @@ export default function Projects({ user, onLogout }) {
   // Xóa project
   const handleDeleteProject = async () => {
     if (!deletingProject) return;
-    const response = await authenticatedFetch(`${API_URL}/projects/${deletingProject.id}`, { method: 'DELETE' });
+    const response = await authenticatedFetch(`${API_URL}/api/projects/${deletingProject.id}`, { method: 'DELETE' });
     if (response && response.ok) {
       toast.success('Xóa project thành công!');
       setDeletingProject(null); fetchProjects();
@@ -188,7 +188,7 @@ export default function Projects({ user, onLogout }) {
                     </div>
                     <div>
                         <div style={{fontWeight:'600', color:'#172b4d'}}>{user?.name}</div>
-                        <div style={{fontSize:'12px', color:'#5e6c84'}}>{user?.email}</div>
+                        {/* <div style={{fontSize:'12px', color:'#5e6c84'}}>{user?.email}</div> */}
                     </div>
                 </div>
             </div>

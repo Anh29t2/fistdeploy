@@ -9,6 +9,7 @@ import EditTaskModal from "./components/EditTaskModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
+import ChatWidget from "./components/ChatWidget";
 
 function Home({ user, onLogout }) {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ function Home({ user, onLogout }) {
 
   const fetchTasks = async () => {
     if (!user?.id) return;
-    const response = await authenticatedFetch(`${API_URL}/tasks?user_id=${user.id}`);
+    const response = await authenticatedFetch(`${API_URL}/api/tasks?user_id=${user.id}`);
     if (response && response.ok) {
         const data = await response.json();
         setTasks(Array.isArray(data) ? data : []);
@@ -78,7 +79,7 @@ function Home({ user, onLogout }) {
     );
     setTasks(updatedTasks);
 
-    await authenticatedFetch(`${API_URL}/tasks/${draggableId}`, {
+    await authenticatedFetch(`${API_URL}/api/tasks/${draggableId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -92,7 +93,7 @@ function Home({ user, onLogout }) {
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) { toast.warning("Nhập tên công việc!"); return; }
-    const response = await authenticatedFetch(`${API_URL}/tasks`, {
+    const response = await authenticatedFetch(`${API_URL}/api/tasks`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id, title: newTaskTitle, description: newTaskDescription, priority: newTaskPriority, deadline: newTaskDeadline }),
     });
@@ -104,14 +105,14 @@ function Home({ user, onLogout }) {
 
   const confirmDelete = async () => {
     if (!deletingTask) return;
-    const response = await authenticatedFetch(`${API_URL}/tasks/${deletingTask.id}`, { method: 'DELETE' });
+    const response = await authenticatedFetch(`${API_URL}/api/tasks/${deletingTask.id}`, { method: 'DELETE' });
     if (response && response.ok) { toast.success("Đã xóa!"); setDeletingTask(null); } 
     else { toast.error("Lỗi xóa!"); }
   };
 
   const handleSaveEdit = async () => {
     if (!editingTask.title.trim()) return;
-    const response = await authenticatedFetch(`${API_URL}/tasks/${editingTask.id}`, {
+    const response = await authenticatedFetch(`${API_URL}/api/tasks/${editingTask.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: editingTask.title, status: editingTask.status, priority: editingTask.priority, deadline: editingTask.deadline, description: editingTask.description })
     });
@@ -208,7 +209,7 @@ function Home({ user, onLogout }) {
             </div>
         </main>
 
-        {/* 3. RIGHT SIDEBAR (CỘT PHẢI MỚI - GIỐNG JIRA) */}
+        {/* 3. RIGHT SIDEBAR */}
         <aside className="right-sidebar">
             {/* User Profile */}
             <div>
@@ -222,7 +223,7 @@ function Home({ user, onLogout }) {
                     </div>
                     <div>
                         <div style={{fontWeight:'600', color:'#172b4d'}}>{user?.name}</div>
-                        <div style={{fontSize:'12px', color:'#5e6c84'}}>{user?.email}</div>
+                        {/* <div style={{fontSize:'12px', color:'#5e6c84'}}>{user?.email}</div> */}
                     </div>
                 </div>
             </div>
@@ -293,6 +294,7 @@ function Home({ user, onLogout }) {
       <ChangePasswordModal
         isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={fetchTasks}
       />
+      <ChatWidget user={user} API_URL={API_URL} />
     </>
   );
 }

@@ -334,7 +334,7 @@ body {
 }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .modal-header h3 { margin: 0; font-size: 20px; }
-.modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+.modal-close { background: #f3f1f1; border:#111111; font-size: 20px; cursor: pointer; color: #eb1111; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .modal-btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; border: none; }
 .modal-cancel { background: #e4e6eb; color: #333; }
@@ -901,36 +901,52 @@ background-color: #f4f5f7;
   background-color: #fafbfc; /* Màu nền bảng */
 }
 
-/* thêm khung chat */
-/* 1. Nút tròn nổi (Floating Button) */
+/* Nút Chat tròn ở góc màn hình */
 .chat-widget-btn {
   position: fixed;
-  bottom: 30px;
-  right: 30px;
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, #6a11cb, #2575fc);
+  bottom: 40px;
+  right: 130px;
+  z-index: 9999;
+
+  /* Kích thước & Hình dáng */
+  width: 70px;
+  height: 70px;
+  border-radius: 50%; /* Làm tròn tuyệt đối */
+  background: linear-gradient(135deg, #2575fc);
   color: white;
-  border-radius: 50%;
   border: none;
+
+  /* Đổ bóng nhẹ để nút nổi lên */
   box-shadow: 0 4px 15px rgba(37, 117, 252, 0.4);
   cursor: pointer;
+
+  /* Căn giữa Icon (Quan trọng) */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  z-index: 9999;
+
+  /* Hiệu ứng chuyển động */
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-.chat-widget-btn:hover {
-  transform: scale(1.1) rotate(5deg);
+
+/* Tùy chỉnh riêng cho Icon bên trong nút */
+.chat-widget-btn svg {
+  width: 28px;      /* Đảm bảo kích thước icon cố định */
+  height: 28px;
+  pointer-events: none; /* Tránh bấm nhầm vào icon thay vì nút */
+}
+
+
+/* Hiệu ứng khi bấm xuống */
+.chat-widget-btn:active {
+  transform: scale(0.95);
 }
 
 /* 2. Khung cửa sổ chat */
 .chat-window {
   position: fixed;
-  bottom: 100px;
-  right: 30px;
+  bottom: 115px;
+  right: 20px;
   width: 360px;
   height: 500px;
   background: white;
