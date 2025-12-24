@@ -8,24 +8,30 @@ import AddTaskModal from "./components/AddTaskModal";
 import EditTaskModal from "./components/EditTaskModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
-import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
+import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus, FaBell } from "react-icons/fa";
 import ChatWidget from "./components/ChatWidget";
 
 function Home({ user, onLogout }) {
   const navigate = useNavigate();
   
-  // --- BỎ state isSidebarOpen ---
-  
   const [tasks, setTasks] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   
-  // State form
+  // --- STATE THÔNG BÁO ---
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+  // --- STATE FORM THÊM MỚI ---
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDeadline, setNewTaskDeadline] = useState("");
+  
+  // 🔥 [QUAN TRỌNG] THÊM 2 DÒNG NÀY ĐỂ FIX LỖI
+  const [newTaskProjectId, setNewTaskProjectId] = useState(""); 
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("");
 
   const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
@@ -58,14 +64,64 @@ function Home({ user, onLogout }) {
     }
   };
 
+  // --- FETCH DỮ LIỆU BAN ĐẦU ---
   useEffect(() => {
-    if(user?.id) fetchTasks(); 
+    if(user?.id) {
+        fetchTasks(); 
+        
+        // Lấy danh sách thông báo cũ
+        authenticatedFetch(`${API_URL}/api/notifications`)
+            .then(res => res.json())
+            .then(data => { if(Array.isArray(data)) setNotifications(data); })
+            .catch(err => console.error("Lỗi tải thông báo:", err));
+    }
+  }, [user]);
+
+  // --- SOCKET IO ---
+  useEffect(() => {
     const socket = io(API_URL);
+    socket.emit('register_user', user.id);
+    
+    // Cập nhật Task khi có thay đổi
     socket.on('server_update_data', () => {
         if (!document.body.classList.contains('is-dragging')) fetchTasks(); 
     });
+
+    // --- LẮNG NGHE THÔNG BÁO MỚI ---
+    socket.on('new_notification', (newNotif) => {
+        setNotifications(prev => [newNotif, ...prev]);
+        toast.info(`🔔 ${newNotif.content}`); // Hiện popup thông báo
+    });
+
     return () => { socket.disconnect(); };
   }, [user]);
+
+  // --- XỬ LÝ SỰ KIỆN THÔNG BÁO ---
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const handleBellClick = () => {
+      setShowNotifDropdown(!showNotifDropdown);
+      // Nếu đang mở dropdown và có tin chưa đọc -> Đánh dấu tất cả đã đọc
+      if (!showNotifDropdown && unreadCount > 0) {
+          setNotifications(prev => prev.map(n => ({...n, is_read: 1}))); // Update UI ngay
+          authenticatedFetch(`${API_URL}/api/notifications/read-all`, { method: 'PUT' }); // Gọi API
+      }
+  };
+
+  const handleNotificationClick = (notif) => {
+      // Nếu thông báo có link -> Chuyển hướng
+      if (notif.link) {
+          navigate(notif.link);
+          setShowNotifDropdown(false);
+      }
+  };
+
+  const formatNotifTime = (dateString) => {
+      if (!dateString) return "";
+      return new Date(dateString).toLocaleString('vi-VN', { 
+          hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' 
+      });
+  };
 
   // --- DRAG DROP ---
   const handleDragEnd = async (result) => {
@@ -93,13 +149,30 @@ function Home({ user, onLogout }) {
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) { toast.warning("Nhập tên công việc!"); return; }
+    
+    // Gửi thêm project_id và assignee_id
     const response = await authenticatedFetch(`${API_URL}/api/tasks`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, title: newTaskTitle, description: newTaskDescription, priority: newTaskPriority, deadline: newTaskDeadline }),
+        body: JSON.stringify({ 
+            user_id: user.id, 
+            title: newTaskTitle, 
+            description: newTaskDescription, 
+            priority: newTaskPriority, 
+            deadline: newTaskDeadline,
+            // Thêm 2 trường này
+            project_id: newTaskProjectId || null,
+            assignee_id: newTaskAssigneeId || null
+        }),
     });
+
     if (response && response.ok) {
         toast.success("Thêm thành công!");
-        setNewTaskTitle(""); setNewTaskDescription(""); setIsAddingTask(false); fetchTasks();
+        setNewTaskTitle(""); 
+        setNewTaskDescription(""); 
+        setNewTaskProjectId(""); // Reset
+        setNewTaskAssigneeId(""); // Reset
+        setIsAddingTask(false); 
+        fetchTasks();
     } else { toast.error("Lỗi thêm việc!"); }
   };
 
@@ -114,7 +187,14 @@ function Home({ user, onLogout }) {
     if (!editingTask.title.trim()) return;
     const response = await authenticatedFetch(`${API_URL}/api/tasks/${editingTask.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editingTask.title, status: editingTask.status, priority: editingTask.priority, deadline: editingTask.deadline, description: editingTask.description })
+        body: JSON.stringify({ 
+            title: editingTask.title, 
+            status: editingTask.status, 
+            priority: editingTask.priority, 
+            deadline: editingTask.deadline, 
+            description: editingTask.description,
+            assignee_id: editingTask.assignee_id // Gửi assignee_id khi sửa
+        })
     });
     if (response && response.ok) { toast.success("Cập nhật xong!"); setEditingTask(null); await fetchTasks(); }
     else { toast.error("Lỗi cập nhật!"); }
@@ -128,7 +208,7 @@ function Home({ user, onLogout }) {
   };
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "";
 
-  // --- THỐNG KÊ (Dùng cho Cột Phải) ---
+  // --- THỐNG KÊ ---
   const stats = {
       total: tasks.length,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -141,12 +221,11 @@ function Home({ user, onLogout }) {
     <>
       <div className="app-container">
         
-        {/* 1. SIDEBAR TRÁI (CỐ ĐỊNH - KHÔNG CÓ NÚT TOGGLE) */}
+        {/* 1. SIDEBAR TRÁI */}
         <aside className="sidebar">
             <div className="sidebar-header">
                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
                   <div style={{width:'32px', height:'32px', background:'#2f352dff', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold'}}>
-  
                   </div>
                   <div style={{ alignItems:'center' , fontWeight:'bold', fontSize:'18px', color:'#333'}}>ABCD Project</div>
                </div>
@@ -175,7 +254,7 @@ function Home({ user, onLogout }) {
             </div>
         </aside>
 
-        {/* 2. MAIN CONTENT (GIỮA) */}
+        {/* 2. MAIN CONTENT */}
         <main className="main-content">
             <header className="main-header">
                 <div>
@@ -183,7 +262,8 @@ function Home({ user, onLogout }) {
                    <small style={{color:'#6b778c'}}>Các công việc gần đây</small>
                 </div>
                 
-                <div style={{display:'flex', gap:'10px'}}>
+                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                   {/* Search */}
                    <div style={{position:'relative'}}>
                         <FaSearch style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
                         <input 
@@ -195,6 +275,70 @@ function Home({ user, onLogout }) {
                             onChange={(e) => setSearchTerm(e.target.value)} 
                         />
                    </div>
+
+                   {/* --- NÚT CHUÔNG THÔNG BÁO --- */}
+                   <div style={{position: 'relative', cursor: 'pointer'}} onClick={handleBellClick}>
+                        <div style={{
+                            width: '36px', height: '36px', 
+                            background: showNotifDropdown ? '#e6f0ff' : 'white', 
+                            borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '1px solid #ddd', transition: 'all 0.2s'
+                        }}>
+                             <FaBell size={18} color={showNotifDropdown ? '#0052cc' : '#555'} />
+                        </div>
+                        
+                        {unreadCount > 0 && (
+                            <span style={{
+                                position: 'absolute', top: -2, right: -2,
+                                background: '#e05d5d', color: 'white', fontSize: '10px', fontWeight: 'bold',
+                                width: '16px', height: '16px', borderRadius: '50%',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: '2px solid white'
+                            }}>
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                        )}
+
+                        {showNotifDropdown && (
+                            <div style={{
+                                position: 'absolute', right: -60, top: 45, width: '320px',
+                                background: 'white', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                                borderRadius: '12px', zIndex: 1000, overflow: 'hidden', border: '1px solid #eee'
+                            }} onClick={(e) => e.stopPropagation()}>
+                                <div style={{padding: '12px 16px', borderBottom: '1px solid #eee', fontWeight: 'bold', fontSize: '15px', color:'#333', background:'#fafafa'}}>
+                                    Thông báo
+                                </div>
+                                <div style={{maxHeight: '350px', overflowY: 'auto'}}>
+                                    {notifications.length === 0 ? (
+                                        <p style={{padding: '30px', textAlign: 'center', color: '#999', fontSize: '13px'}}>Chưa có thông báo nào</p>
+                                    ) : (
+                                        notifications.map((notif, idx) => (
+                                            <div key={idx} 
+                                                 onClick={() => handleNotificationClick(notif)}
+                                                 style={{
+                                                    padding: '12px 16px', 
+                                                    borderBottom: '1px solid #f5f5f5',
+                                                    background: notif.is_read ? 'white' : '#f0f7ff',
+                                                    cursor: 'pointer',
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px'
+                                                 }}
+                                                 onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                                 onMouseLeave={(e) => e.currentTarget.style.background = notif.is_read ? 'white' : '#f0f7ff'}
+                                            >
+                                                <div style={{flex: 1, fontSize: '13px', color: '#333', lineHeight: '1.4'}}>
+                                                    {notif.content}
+                                                </div>
+                                                <div style={{fontSize: '11px', color: '#999', whiteSpace: 'nowrap', marginTop: '2px'}}>
+                                                    {formatNotifTime(notif.created_at)}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                   </div>
+
                    <button className="btn-add" onClick={() => setIsAddingTask(true)} style={{padding: '8px 16px', fontSize: '14px', display:'flex', alignItems:'center', gap:'5px'}}>
                        <FaPlus /> Tạo mới
                    </button>
@@ -211,7 +355,6 @@ function Home({ user, onLogout }) {
 
         {/* 3. RIGHT SIDEBAR */}
         <aside className="right-sidebar">
-            {/* User Profile */}
             <div>
                 <div className="right-section-title">PROFILE</div>
                 <div style={{display:'flex', alignItems:'center', gap:'12px', paddingBottom:'20px', borderBottom:'1px solid #eee'}}>
@@ -223,12 +366,10 @@ function Home({ user, onLogout }) {
                     </div>
                     <div>
                         <div style={{fontWeight:'600', color:'#172b4d'}}>{user?.name}</div>
-                        {/* <div style={{fontSize:'12px', color:'#5e6c84'}}>{user?.email}</div> */}
                     </div>
                 </div>
             </div>
 
-            {/* Thống kê Tiến độ */}
             <div>
                 <div className="right-section-title" style={{marginTop: '20px'}}>TIẾN ĐỘ CÔNG VIỆC</div>
                 <div className="info-card">
@@ -256,7 +397,6 @@ function Home({ user, onLogout }) {
                 </div>
             </div>
 
-            {/* Thông báo Updates */}
             <div>
                 <div className="right-section-title" style={{marginTop: '20px'}}>CẬP NHẬT GẦN ĐÂY</div>
                 <div className="info-card" style={{marginBottom:'10px'}}>
@@ -273,18 +413,24 @@ function Home({ user, onLogout }) {
 
       </div>
 
-      {/* --- CÁC MODALS GIỮ NGUYÊN --- */}
+      {/* --- CÁC MODALS --- */}
+      
       <AddTaskModal
         isOpen={isAddingTask} onClose={() => setIsAddingTask(false)} onSubmit={handleAddTask}
         title={newTaskTitle} setTitle={setNewTaskTitle}
         description={newTaskDescription} setDescription={setNewTaskDescription}
         priority={newTaskPriority} setPriority={setNewTaskPriority}
         deadline={newTaskDeadline} setDeadline={setNewTaskDeadline}
+        // Truyền props cho dự án & assignee (GIỜ ĐÃ CÓ STATE ĐỂ TRUYỀN)
+        projectId={newTaskProjectId} setProjectId={setNewTaskProjectId}
+        assigneeId={newTaskAssigneeId} setAssigneeId={setNewTaskAssigneeId}
+        currentUserId={user?.id}
       />
 
       <EditTaskModal
         isOpen={!!editingTask} onClose={() => setEditingTask(null)} onSubmit={handleSaveEdit}
         task={editingTask} setTask={setEditingTask}
+        currentUser={user}
       />
 
       <DeleteConfirmModal

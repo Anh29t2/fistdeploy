@@ -1,16 +1,60 @@
+import React, { useState, useEffect } from 'react';
+
 export default function AddTaskModal({
   isOpen,
   onClose,
   onSubmit,
-  title,
-  setTitle,
-  description,
-  setDescription,
-  priority,
-  setPriority,
-  deadline,
-  setDeadline
+  title, setTitle,
+  description, setDescription,
+  priority, setPriority,
+  deadline, setDeadline,
+  // Các props mới (có thể bị thiếu ở trang ProjectDetail)
+  projectId, setProjectId,
+  assigneeId, setAssigneeId,
+  currentUserId
 }) {
+  const [projects, setProjects] = useState([]); 
+  const [members, setMembers] = useState([]);   
+  const API_URL = 'http://localhost:3000';
+
+  // 1. Load danh sách dự án (Chỉ chạy khi có currentUserId)
+  useEffect(() => {
+    if (isOpen && currentUserId) {
+       const token = localStorage.getItem('access_token');
+       fetch(`${API_URL}/api/projects?user_id=${currentUserId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+       })
+       .then(res => res.json())
+       .then(data => {
+           if(Array.isArray(data)) setProjects(data);
+       })
+       .catch(err => console.error(err));
+    }
+  }, [isOpen, currentUserId]);
+
+  // 2. Load thành viên khi projectId thay đổi
+  useEffect(() => {
+      // Nếu có projectId thì mới load thành viên
+      if (projectId) {
+          const token = localStorage.getItem('access_token');
+          fetch(`${API_URL}/api/projects/${projectId}/members`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+          })
+          .then(res => res.json())
+          .then(data => {
+              if(Array.isArray(data)) setMembers(data);
+          })
+          .catch(err => console.error(err));
+      } else {
+          // Reset list thành viên
+          setMembers([]);
+          // 🔥 QUAN TRỌNG: Kiểm tra xem hàm này có tồn tại không trước khi gọi
+          if (typeof setAssigneeId === 'function') {
+              setAssigneeId("");
+          }
+      }
+  }, [projectId]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
@@ -28,7 +72,7 @@ export default function AddTaskModal({
 
         <form onSubmit={handleSubmit} className="add-task-form">
           <div className="form-group">
-            <label>Tên Công Việc</label>
+            <label>Tên Công Việc <span style={{color:'red'}}>*</span></label>
             <input 
               type="text" 
               className="modal-input" 
@@ -38,6 +82,42 @@ export default function AddTaskModal({
               autoFocus 
             />
           </div>
+
+          {/* Chỉ hiện phần chọn Dự án nếu các props này được truyền vào */}
+          {setProjectId && setAssigneeId && (
+            <div className="modal-row">
+                <div style={{flex: 1}}>
+                    <label>Thuộc Dự Án</label>
+                    <select 
+                        className="modal-input"
+                        style={{width:'100%'}}
+                        value={projectId || ""}
+                        onChange={(e) => setProjectId(e.target.value)}
+                    >
+                        <option value="">-- Cá nhân (Không dự án) --</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                </div>
+                
+                <div style={{flex: 1}}>
+                    <label>Người thực hiện</label>
+                    <select 
+                        className="modal-input"
+                        style={{width:'100%'}}
+                        value={assigneeId || ""}
+                        onChange={(e) => setAssigneeId(e.target.value)}
+                        disabled={!projectId} 
+                    >
+                        <option value="">-- Chưa giao --</option>
+                        {members.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label>Mô Tả</label>
@@ -76,12 +156,8 @@ export default function AddTaskModal({
           </div>
 
           <div className="modal-actions">
-            <button type="button" onClick={onClose} className="modal-btn modal-cancel">
-              Hủy
-            </button>
-            <button type="submit" className="modal-btn modal-save">
-              Thêm
-            </button>
+            <button type="button" onClick={onClose} className="modal-btn modal-cancel">Hủy</button>
+            <button type="submit" className="modal-btn modal-save">Thêm</button>
           </div>
         </form>
       </div>

@@ -1,30 +1,41 @@
 const connection = require('../config/db');
 
-const CreateNotification = async (app, receiverId, message, link = null) => {
+// Đổi tên hàm thành chữ thường 'c' để khớp với taskController
+const createNotification = async (app, receiverId, message, link = null) => {
     try {
+        // 1. Lưu vào Database
+        // Thêm cột is_read = 0 và created_at = NOW()
         const [results] = await connection.promise().query(
-        'INSERT INTO notifications (user_id,content,link) VALUES (?, ?, ?)',
-        [receiverId, message, link]
+            'INSERT INTO notifications (user_id, content, link, is_read, created_at) VALUES (?, ?, ?, 0, NOW())',
+            [receiverId, message, link]
         );
 
-        // Chuẩn bị dữ liệu thông báo để gửi qua Socket.io
+        // 2. Chuẩn bị dữ liệu gửi Socket
         const newNotifi = {
             id: results.insertId,
             user_id: receiverId,
             content: message,
             link: link,
             is_read: 0,
-            create_at: new Date().toISOString()
+            created_at: new Date().toISOString() // Đổi thành created_at cho khớp Frontend
         };
-        // Gửi thông báo qua Socket.io
-        const io = app.get('io');
-        if(io){
-            io.to(`user_${receiverId}`).emit('new_notification', newNotifi);
-            console.log(`Đã báo cho user ${receiverId}: ${message}`);
+
+        // 3. Gửi thông báo qua Socket.io
+        // LƯU Ý: Phải dùng 'socketio' vì bên server.js ta set là 'socketio'
+        const io = app.get('socketio'); 
+        
+        if (io) {
+            // LƯU Ý: Gửi thẳng vào ID (vì bên server.js ta socket.join(userId))
+            // Ép kiểu String cho chắc chắn
+            io.to(String(receiverId)).emit('new_notification', newNotifi);
+            console.log(`🔔 Đã báo cho user ${receiverId}: ${message}`);
         }
 
-    }catch(error){
+    } catch (error) {
         console.error('Error creating notification:', error);
+        // Không throw error để tránh làm crash luồng chính (tạo task) nếu chỉ lỗi thông báo
     }
 };
-module.exports = { CreateNotification };
+
+// Export đúng tên createNotification
+module.exports = { createNotification };

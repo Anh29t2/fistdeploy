@@ -7,7 +7,7 @@ const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
 const projectRouters = require('../routes/projectRoutes.js')
 const messageRoutes = require('../routes/messageRoutes.js');
 const notificationRoutes = require('../routes/notificationRoutes.js');
-const { createNotification } = require('../utils/notificationUtils.js');
+const { createNotification } = require('../utils/notificationHelper.js');
 
 require('dotenv').config();
 
@@ -42,7 +42,11 @@ io.on('connection', (socket) => {
 
     // 1. User đăng nhập -> Join vào phòng riêng (để chat 1-1)
     socket.on('register_user', (userId) => {
-        if (userId) socket.join(userId);
+        if (userId) {
+            const roomName = String(userId); // Ép về chuỗi "1" thay vì số 1
+            socket.join(roomName);
+            console.log(`✅ User ${userId} đã join vào room: ${roomName}`);
+        }
     });
 
     // 2. User mở dự án -> Join vào phòng dự án (để chat chung)
