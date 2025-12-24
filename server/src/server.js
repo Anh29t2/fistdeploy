@@ -6,6 +6,8 @@ const authRouters = require('../routes/authRoutes.js');
 const taskRoutes = require('../routes/taskRoutes'); // 1. Import file routes
 const projectRouters = require('../routes/projectRoutes.js')
 const messageRoutes = require('../routes/messageRoutes.js');
+const notificationRoutes = require('../routes/notificationRoutes.js');
+const { createNotification } = require('../utils/notificationUtils.js');
 
 require('dotenv').config();
 
@@ -23,6 +25,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/auth',authRouters);
 app.use('/api/projects',projectRouters);
 app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -48,23 +51,30 @@ io.on('connection', (socket) => {
     });
 
     // 3. Xử lý khi nhận tin nhắn
-    socket.on('send_message', async (data) => {
+socket.on('send_message', async (data) => {
         try {
-            // A. Lưu vào Database (Bắt buộc)
+            // A. Lưu tin nhắn vào DB
             await connection.promise().query(
                 'INSERT INTO messages (sender_id, receiver_id, project_id, content) VALUES (?, ?, ?, ?)',
                 [data.senderId, data.receiverId || null, data.projectId || null, data.content]
             );
 
-            // B. Gửi tin nhắn đi
+            // B. Gửi tin nhắn qua Socket (Chat Realtime)
             if (data.projectId) {
-                // Chat chung: Gửi cho cả phòng dự án
                 io.to(data.projectId).emit('receive_message', data);
             } else if (data.receiverId) {
-                // Chat riêng: Gửi cho người nhận
                 io.to(data.receiverId).emit('receive_message', data);
-                // Gửi lại cho chính mình (để hiện lên màn hình ngay)
                 socket.emit('receive_message', data);
+
+                // 3. [NEW] Tạo thông báo cho Chat Riêng
+                // Khi có người nhắn tin riêng, tạo thêm 1 thông báo vào cái chuông
+                // Để dù họ đang lướt ở trang khác cũng biết có tin nhắn
+                await createNotification(
+                    app, 
+                    data.receiverId, 
+                    `${data.senderName} đã nhắn tin cho bạn`, 
+                    null // Chat thì có thể null link hoặc để link mở chat nếu muốn
+                );
             }
         } catch (err) {
             console.error("Lỗi lưu tin nhắn:", err);

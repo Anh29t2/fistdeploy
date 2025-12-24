@@ -1,4 +1,5 @@
 const connection = require('../config/db');
+const { CreateNotification } = require('../utils/notificationHelper');
 
 // 1. Lấy danh sách task (Đã nâng cấp: Hỗ trợ lấy tất cả hoặc lấy theo dự án + JOIN với project name)
 exports.getTasks = async (req, res) => {
@@ -45,41 +46,87 @@ exports.getTasks = async (req, res) => {
 
 // 2. Thêm task mới (Chuẩn chỉnh)
 exports.createTask = async (req, res) => {
-    let { user_id, project_id, title, description, priority, deadline } = req.body;
+    let { title, description, priority, deadline, user_id, assignee_id, project_id } = req.body;
     
     try {
-        // Xử lý deadline: nếu trống hoặc null thì lưu null, nếu không thì chuẩn hóa ngày
+        // 1. Xử lý deadline (Giữ nguyên logic của bạn)
         if (!deadline || deadline === '') {
             deadline = null;
         } else {
-            // Đảm bảo deadline ở format YYYY-MM-DD
             if (typeof deadline === 'string') {
-                deadline = deadline.split('T')[0]; // Loại bỏ phần time nếu có
+                deadline = deadline.split('T')[0];
             }
         }
 
-        await connection.promise().query(
-            'INSERT INTO tasks (user_id, project_id, title, description, priority, deadline) VALUES (?, ?, ?, ?, ?, ?)',
-            [
-                user_id,
-                project_id || null, // Nếu không có dự án thì để null
-                title,
-                description || '',
-                priority || 'medium',
-                deadline
-            ]
-        );
+        // 2. INSERT VÀO DATABASE (Đã sửa lại thứ tự tham số cho đúng với SQL)
+        const sqlInsert = `
+            INSERT INTO tasks (title, description, priority, deadline, user_id, assignee_id, project_id, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        `;
+
+        // Lưu ý: Thứ tự biến trong mảng này phải KHỚP 100% với danh sách cột ở trên
+        await connection.promise().query(sqlInsert, [
+            title,
+            description || '',
+            priority || 'medium',
+            deadline,
+            user_id,
+            assignee_id || null, // Nếu không chọn người giao việc thì lưu null
+            project_id || null
+        ]);
         
-        // Bắn Socket để cập nhật Real-time
+        // 3. LOGIC GỬI THÔNG BÁO (THÊM MỚI)
+        if (project_id) {
+            // A. Lấy danh sách thành viên dự án
+            const [members] = await connection.promise().query(
+                `SELECT user_id FROM project_members WHERE project_id = ?`, 
+                [project_id]
+            );
+
+            const targetLink = `/projects/${project_id}`; 
+            
+            // B. Duyệt và gửi thông báo
+            const notificationPromises = members.map(member => {
+                const memberIdStr = String(member.user_id);
+                const creatorIdStr = String(user_id);
+                const assigneeIdStr = assignee_id ? String(assignee_id) : null;
+
+                // - Không báo cho chính người tạo task
+                if (memberIdStr === creatorIdStr) return null;
+
+                // - Báo riêng cho người được giao việc (Assignee)
+                if (memberIdStr === assigneeIdStr) {
+                    return createNotification(
+                        req.app, 
+                        member.user_id, 
+                        `Bạn vừa được giao công việc mới: "${title}"`, 
+                        targetLink
+                    );
+                }
+
+                // - Báo chung cho thành viên khác
+                return createNotification(
+                    req.app, 
+                    member.user_id, 
+                    `Dự án có công việc mới: "${title}"`, 
+                    targetLink
+                );
+            });
+
+            await Promise.all(notificationPromises);
+        }
+
+        // 4. Bắn Socket cập nhật Kanban Board (Real-time)
         const io = req.app.get('socketio');
-        if (io) io.emit('server_update_data'); // Thêm if để tránh lỗi nếu socket chưa init
+        if (io) io.emit('server_update_data'); 
         
         res.status(201).json({ message: 'Thêm công việc thành công!' });
+
     } catch (error) {
+        console.error("Lỗi tạo task:", error); // Log lỗi ra console để dễ debug
         res.status(500).json({ error: error.message });
     }
 };
-
 // 3. Cập nhật task (Chuẩn chỉnh)
 exports.updateTask = async (req, res) => {
     const { id } = req.params;
