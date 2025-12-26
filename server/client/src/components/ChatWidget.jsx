@@ -5,7 +5,7 @@ import { FaTimes, FaPaperPlane, FaArrowLeft, FaList, FaCommentDots } from 'react
 export default function ChatWidget({ user, projectId, API_URL }) {
   const [isOpen, setIsOpen] = useState(false);
   
-  // State quản lý dự án
+  // State quản lý
   const [currentProjectId, setCurrentProjectId] = useState(projectId || null);
   const [myProjects, setMyProjects] = useState([]); 
 
@@ -22,24 +22,22 @@ export default function ChatWidget({ user, projectId, API_URL }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // --- SỬA LỖI LỆCH GIỜ ---
   const formatTime = (dateString) => {
       if (!dateString) return "";
-      
       let date;
-      // Nếu chuỗi thời gian chưa có chữ 'Z' ở cuối (đặc điểm của giờ UTC), 
-      // ta tự thêm vào để trình duyệt hiểu đây là giờ Quốc tế và tự cộng thêm 7 tiếng cho VN.
       if (typeof dateString === 'string' && !dateString.endsWith('Z')) {
           date = new Date(dateString + 'Z');
       } else {
           date = new Date(dateString);
       }
-
-      // Kiểm tra nếu date bị lỗi
       if (isNaN(date.getTime())) return "";
-
       return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
+
+  // Auto scroll
+  useEffect(() => {
+    scrollToBottom();
+  },[messages, activeTab, privatePartner, isOpen]);
 
   // 1. KẾT NỐI SOCKET
   useEffect(() => {
@@ -47,25 +45,70 @@ export default function ChatWidget({ user, projectId, API_URL }) {
     socketRef.current.emit('register_user', user.id);
 
     socketRef.current.on('receive_message', (newMsg) => {
-        // Khi nhận tin nhắn mới, dùng new Date().toISOString() để đảm bảo có format chuẩn ngay lập tức
         const msgWithTime = { ...newMsg, created_at: newMsg.created_at || new Date().toISOString() };
-        setMessages((prev) => [...prev, msgWithTime]);
+        
+        // Logic cập nhật tin nhắn realtime thông minh hơn:
+        setMessages((prev) => {
+            // Nếu đang chat riêng: Chỉ nhận tin của đúng người đó
+            if (privatePartner) {
+                const isRelevant = 
+                    (String(newMsg.senderId) === String(privatePartner.id)) || 
+                    (String(newMsg.senderId) === String(user.id) && String(newMsg.receiverId) === String(privatePartner.id));
+                return isRelevant ? [...prev, msgWithTime] : prev;
+            } 
+            // Nếu đang chat chung: Chỉ nhận tin của dự án hiện tại (và ko phải tin riêng)
+            else {
+                const isProjectMsg = (String(newMsg.projectId) === String(currentProjectId));
+                return isProjectMsg ? [...prev, msgWithTime] : prev;
+            }
+        });
+        
         setTimeout(scrollToBottom, 100);
     });
 
     return () => socketRef.current.disconnect();
-  }, [API_URL, user.id]);
+  }, [API_URL, user.id, privatePartner, currentProjectId]); // Thêm dependencies để socket cập nhật state đúng
 
-  // 2. JOIN PROJECT
+  // Hàm tải tin nhắn và thành viên (Đưa ra ngoài useEffect để tái sử dụng)
+  const fetchMessagesAndMembers = () => {
+      if (!currentProjectId) return;
+      const token = localStorage.getItem('access_token');
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      // 1. Lấy tin nhắn chung
+      fetch(`${API_URL}/api/messages/project/${currentProjectId}`, { headers })
+        .then(res => res.json())
+        .then(data => { if(Array.isArray(data)) setMessages(data); setTimeout(scrollToBottom, 100); });
+
+      // 2. Lấy thành viên
+      fetch(`${API_URL}/api/projects/${currentProjectId}/members`, { headers })
+        .then(res => res.json())
+        .then(data => { if(Array.isArray(data)) setMembers(data.filter(m => m.id !== user.id)); });
+  };
+
+  // 2. JOIN PROJECT & FETCH DATA
   useEffect(() => {
       if (projectId) setCurrentProjectId(projectId);
-      if (currentProjectId && socketRef.current) {
-          socketRef.current.emit('join_project', currentProjectId);
-          fetchMessagesAndMembers(); 
+      
+      if (currentProjectId) {
+        setMessages([]); // Reset tin nhắn khi đổi dự án
+      if(currentProjectId) socketRef.current.emit('join_project', currentProjectId);
+          // Chỉ fetch dữ liệu chung nếu KHÔNG đang chat riêng
+          if (!privatePartner) {
+              fetchMessagesAndMembers(); 
+          }
       }
   }, [currentProjectId, projectId]);
 
-  // 3. FETCH PROJECTS (HOME)
+  // Khi thoát Chat Riêng (privatePartner về null) -> Gọi lại API lấy tin nhắn chung
+  useEffect(() => {
+      if (currentProjectId && !privatePartner) {
+        setMessages([]); // Reset tin nhắn
+        fetchMessagesAndMembers(); // Lấy lại tin nhắn chung
+      }
+  }, [privatePartner]); 
+
+  // 3. FETCH PROJECT LIST (HOME)
   useEffect(() => {
       if (isOpen && !projectId) {
           const token = localStorage.getItem('access_token');
@@ -78,28 +121,16 @@ export default function ChatWidget({ user, projectId, API_URL }) {
       }
   }, [isOpen, projectId, API_URL, user.id]);
 
-  const fetchMessagesAndMembers = () => {
-      if (!currentProjectId) return;
-      const token = localStorage.getItem('access_token');
-      const headers = { 'Authorization': `Bearer ${token}` };
-
-      fetch(`${API_URL}/api/messages/project/${currentProjectId}`, { headers })
-        .then(res => res.json())
-        .then(data => { if(Array.isArray(data)) setMessages(data); setTimeout(scrollToBottom, 100); });
-
-      fetch(`${API_URL}/api/projects/${currentProjectId}/members`, { headers })
-        .then(res => res.json())
-        .then(data => { if(Array.isArray(data)) setMembers(data.filter(m => m.id !== user.id)); });
-  };
-
   const startPrivateChat = (partner) => {
-      setPrivatePartner(partner);
-      const token = localStorage.getItem('access_token');
-      fetch(`${API_URL}/api/messages/private/${partner.id}`, { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-      })
-      .then(res => res.json())
-      .then(data => { if(Array.isArray(data)) setMessages(data); setTimeout(scrollToBottom, 100); });
+    setMessages([]);
+    setPrivatePartner(partner);
+    const token = localStorage.getItem('access_token');
+    // Gọi API lấy tin nhắn riêng
+    fetch(`${API_URL}/api/messages/private/${partner.id}`, { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    })
+    .then(res => res.json())
+    .then(data => { if(Array.isArray(data)) setMessages(data); setTimeout(scrollToBottom, 100); });
   };
 
   const handleSend = () => {
@@ -110,10 +141,22 @@ export default function ChatWidget({ user, projectId, API_URL }) {
           senderName: user.name, 
           projectId: (activeTab === 'project' && !privatePartner) ? currentProjectId : null,
           receiverId: privatePartner ? privatePartner.id : null,
-          created_at: new Date().toISOString() // Gửi kèm giờ chuẩn ISO
+          created_at: new Date().toISOString()
       };
       socketRef.current.emit('send_message', msgData);
       setInputMsg("");
+  };
+
+  // Logic xử lý nút Back
+  const handleBack = () => {
+      if (privatePartner) {
+          // Trường hợp 1: Đang chat riêng -> Quay về danh sách thành viên
+          setPrivatePartner(null);
+          setActiveTab('members');
+      } else {
+          // Trường hợp 2: Đang ở chat chung -> Quay về danh sách dự án (chỉ khi mở từ Home)
+          setCurrentProjectId(null);
+      }
   };
 
   return (
@@ -125,31 +168,23 @@ export default function ChatWidget({ user, projectId, API_URL }) {
       {isOpen && (
         <div className="chat-window">
           
-          {/* HEADER 3 CỘT (Căn chỉnh chuẩn) */}
           <div className="chat-header" style={{display: 'flex', flexDirection: 'column', padding: '15px 15px 0 15px'}}>
              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '10px'}}>
                 
-                {/* TRÁI: Nút Back */}
                 <div style={{width: '30px', display: 'flex', justifyContent: 'flex-start'}}>
-                    {!projectId && currentProjectId ? (
-                         <button onClick={() => { setCurrentProjectId(null); setPrivatePartner(null); }} style={{background:'none', border:'none', cursor:'pointer', color:'#333', fontSize:'16px'}}>
-                             <FaList title="Danh sách dự án" />
+                    {(privatePartner || (!projectId && currentProjectId)) && (
+                         <button onClick={handleBack} style={{background:'none', border:'none', cursor:'pointer', color:'#333', fontSize:'16px'}} title="Quay lại">
+                             <FaArrowLeft />
                          </button>
-                    ) : privatePartner ? (
-                         <button onClick={() => { setPrivatePartner(null); setActiveTab('members'); }} style={{background:'none', border:'none', cursor:'pointer', color:'#333', fontSize:'16px'}}>
-                             <FaArrowLeft title="Quay lại" />
-                         </button>
-                    ) : null}
+                    )}
                 </div>
 
-                {/* GIỮA: Tiêu đề */}
                 <div style={{flex: 1, textAlign: 'center'}}>
                     <h4 style={{margin: 0, fontSize: '16px', color: '#333'}}>
-                        {!currentProjectId ? "Chọn dự án" : (privatePartner ? privatePartner.name : "Tin Nhắn")}
+                        {!currentProjectId ? "Danh sách dự án" : (privatePartner ? privatePartner.name : "Chat Nhóm")}
                     </h4>
                 </div>
 
-                {/* PHẢI: Nút Đóng (X) */}
                 <div style={{width: '30px', display: 'flex', justifyContent: 'flex-end'}}>
                     <button onClick={() => setIsOpen(false)} style={{background:'none', border:'none', cursor:'pointer', color:'#f31818ff', fontSize:'16px'}} title="Đóng chat">
                         <FaTimes />
@@ -157,7 +192,6 @@ export default function ChatWidget({ user, projectId, API_URL }) {
                 </div>
              </div>
 
-             {/* Tabs */}
              {currentProjectId && !privatePartner && (
                 <div className="chat-tabs" style={{display: 'flex', width: '100%', borderBottom: '1px solid #eee'}}>
                     <button className={`chat-tab ${activeTab === 'project' ? 'active' : ''}`} onClick={() => setActiveTab('project')} style={{flex: 1, padding: '8px', background: activeTab === 'project' ? '#e6f0ff' : 'transparent', border: 'none', color: activeTab === 'project' ? '#0052cc' : '#666', cursor: 'pointer', fontWeight: activeTab === 'project' ? 'bold' : 'normal', borderBottom: activeTab === 'project' ? '2px solid #0052cc' : 'none'}}>Chung</button>
@@ -166,7 +200,6 @@ export default function ChatWidget({ user, projectId, API_URL }) {
              )}
           </div>
 
-          {/* BODY */}
           <div className="chat-body" style={{flex: 1, overflowY: 'auto', padding: '10px'}}>
             {!currentProjectId ? (
                 <div>
@@ -189,31 +222,13 @@ export default function ChatWidget({ user, projectId, API_URL }) {
                             </div>
                         ))
                     ) : (
-                        messages.filter(msg => {
-                            if (privatePartner) {
-                                return (String(msg.sender_id) === String(privatePartner.id) && String(msg.receiver_id) === String(user.id)) || 
-                                       (String(msg.sender_id) === String(user.id) && String(msg.receiver_id) === String(privatePartner.id)) ||
-                                       (String(msg.senderId) === String(privatePartner.id) && String(msg.receiverId) === String(user.id)) || 
-                                       (String(msg.senderId) === String(user.id) && String(msg.receiverId) === String(privatePartner.id));
-                            } else {
-                                return (msg.project_id == currentProjectId || msg.projectId == currentProjectId) && !msg.receiver_id && !msg.receiverId;
-                            }
-                        }).map((msg, index) => {
-                            // Ép kiểu về String để so sánh chính xác 100%
-                            const isMine = String(msg.sender_id) === String(user.id) || String(msg.senderId) === String(user.id);
-                            
+                        messages.map((msg, index) => {
+                            const isMine = String(msg.sender_id || msg.senderId) === String(user.id);
                             return (
                                 <div key={index} className={`message-bubble ${isMine ? 'mine' : 'other'}`}>
                                     {!isMine && <span className="message-sender">{msg.sender_name || msg.senderName}</span>}
-                                    
                                     <div>{msg.content}</div>
-
-                                    <div style={{
-                                        fontSize: '10px', 
-                                        marginTop: '4px', 
-                                        textAlign: 'right',
-                                        color: isMine ? 'rgba(255, 255, 255, 0.7)' : '#888'
-                                    }}>
+                                    <div style={{fontSize: '10px', marginTop: '4px', textAlign: 'right', color: isMine ? 'rgba(255, 255, 255, 0.7)' : '#888'}}>
                                         {formatTime(msg.created_at || msg.createdAt)}
                                     </div>
                                 </div>
@@ -225,7 +240,6 @@ export default function ChatWidget({ user, projectId, API_URL }) {
             )}
           </div>
 
-          {/* FOOTER */}
           {(currentProjectId && (activeTab === 'project' || privatePartner)) && (
               <div className="chat-footer">
                 <input 

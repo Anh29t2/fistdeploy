@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
+// 1. Import ToastContainer và CSS
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css"; 
+
 import './App.css';
 import io from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
@@ -18,18 +21,15 @@ function Home({ user, onLogout }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   
-  // --- STATE THÔNG BÁO ---
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
-  // --- STATE FORM THÊM MỚI ---
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDeadline, setNewTaskDeadline] = useState("");
   
-  // 🔥 [QUAN TRỌNG] THÊM 2 DÒNG NÀY ĐỂ FIX LỖI
   const [newTaskProjectId, setNewTaskProjectId] = useState(""); 
   const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("");
 
@@ -38,7 +38,6 @@ function Home({ user, onLogout }) {
 
   const API_URL = 'http://localhost:3000';
 
-  // --- HELPER & FETCH ---
   const getToken = () => localStorage.getItem('access_token');
 
   const authenticatedFetch = async (url, options = {}) => {
@@ -64,12 +63,9 @@ function Home({ user, onLogout }) {
     }
   };
 
-  // --- FETCH DỮ LIỆU BAN ĐẦU ---
   useEffect(() => {
     if(user?.id) {
         fetchTasks(); 
-        
-        // Lấy danh sách thông báo cũ
         authenticatedFetch(`${API_URL}/api/notifications`)
             .then(res => res.json())
             .then(data => { if(Array.isArray(data)) setNotifications(data); })
@@ -79,37 +75,54 @@ function Home({ user, onLogout }) {
 
   // --- SOCKET IO ---
   useEffect(() => {
+    if (!user?.id) return;
+
     const socket = io(API_URL);
-    socket.emit('register_user', user.id);
     
-    // Cập nhật Task khi có thay đổi
+    socket.on('connect', () => {
+        console.log("🟢 Socket Connected:", socket.id);
+        socket.emit('register_user', String(user.id)); 
+    });
+    
     socket.on('server_update_data', () => {
         if (!document.body.classList.contains('is-dragging')) fetchTasks(); 
     });
 
-    // --- LẮNG NGHE THÔNG BÁO MỚI ---
+    // 1. THÔNG BÁO HỆ THỐNG (Task, Deadline...) -> Vẫn vào Chuông + Toast
     socket.on('new_notification', (newNotif) => {
         setNotifications(prev => [newNotif, ...prev]);
-        toast.info(`🔔 ${newNotif.content}`); // Hiện popup thông báo
+        toast.info(`🔔 ${newNotif.content}`); 
     });
 
+    // 2. TIN NHẮN (CHAT) -> CHỈ HIỆN TOAST, KHÔNG VÀO CHUÔNG
+    socket.on('receive_message', (data) => {
+        // Chỉ hiện Toast nếu người gửi KHÔNG PHẢI là mình
+        if (String(data.senderId) !== String(user.id)) {
+             toast.info(` ${data.senderName || 'Ai đó'} đã nhắn tin cho bạn}`, {
+                position: "top-right",
+                autoClose: 4000,      // Tự đóng sau 4s
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+             });
+        }
+    });
+    
     return () => { socket.disconnect(); };
   }, [user]);
 
-  // --- XỬ LÝ SỰ KIỆN THÔNG BÁO ---
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const handleBellClick = () => {
       setShowNotifDropdown(!showNotifDropdown);
-      // Nếu đang mở dropdown và có tin chưa đọc -> Đánh dấu tất cả đã đọc
       if (!showNotifDropdown && unreadCount > 0) {
-          setNotifications(prev => prev.map(n => ({...n, is_read: 1}))); // Update UI ngay
-          authenticatedFetch(`${API_URL}/api/notifications/read-all`, { method: 'PUT' }); // Gọi API
+          setNotifications(prev => prev.map(n => ({...n, is_read: 1}))); 
+          authenticatedFetch(`${API_URL}/api/notifications/read-all`, { method: 'PUT' }); 
       }
   };
 
   const handleNotificationClick = (notif) => {
-      // Nếu thông báo có link -> Chuyển hướng
       if (notif.link) {
           navigate(notif.link);
           setShowNotifDropdown(false);
@@ -123,7 +136,6 @@ function Home({ user, onLogout }) {
       });
   };
 
-  // --- DRAG DROP ---
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
@@ -145,12 +157,10 @@ function Home({ user, onLogout }) {
     });
   };
 
-  // --- CRUD ACTIONS ---
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) { toast.warning("Nhập tên công việc!"); return; }
     
-    // Gửi thêm project_id và assignee_id
     const response = await authenticatedFetch(`${API_URL}/api/tasks`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -159,7 +169,6 @@ function Home({ user, onLogout }) {
             description: newTaskDescription, 
             priority: newTaskPriority, 
             deadline: newTaskDeadline,
-            // Thêm 2 trường này
             project_id: newTaskProjectId || null,
             assignee_id: newTaskAssigneeId || null
         }),
@@ -169,8 +178,8 @@ function Home({ user, onLogout }) {
         toast.success("Thêm thành công!");
         setNewTaskTitle(""); 
         setNewTaskDescription(""); 
-        setNewTaskProjectId(""); // Reset
-        setNewTaskAssigneeId(""); // Reset
+        setNewTaskProjectId(""); 
+        setNewTaskAssigneeId(""); 
         setIsAddingTask(false); 
         fetchTasks();
     } else { toast.error("Lỗi thêm việc!"); }
@@ -193,7 +202,7 @@ function Home({ user, onLogout }) {
             priority: editingTask.priority, 
             deadline: editingTask.deadline, 
             description: editingTask.description,
-            assignee_id: editingTask.assignee_id // Gửi assignee_id khi sửa
+            assignee_id: editingTask.assignee_id 
         })
     });
     if (response && response.ok) { toast.success("Cập nhật xong!"); setEditingTask(null); await fetchTasks(); }
@@ -207,8 +216,6 @@ function Home({ user, onLogout }) {
     completed: { title: "✅ Hoàn thành", color: "#10b981", items: filteredTasks.filter(t => t.status === 'completed') }
   };
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "";
-
-  // --- THỐNG KÊ ---
   const stats = {
       total: tasks.length,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -219,9 +226,14 @@ function Home({ user, onLogout }) {
 
   return (
     <>
+      {/* 2. [QUAN TRỌNG] Thêm ToastContainer vào đây để popup hiện ra */}
+      <ToastContainer 
+        position="top-right"
+        autoClose={3000}
+      />
+
       <div className="app-container">
         
-        {/* 1. SIDEBAR TRÁI */}
         <aside className="sidebar">
             <div className="sidebar-header">
                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
@@ -254,7 +266,6 @@ function Home({ user, onLogout }) {
             </div>
         </aside>
 
-        {/* 2. MAIN CONTENT */}
         <main className="main-content">
             <header className="main-header">
                 <div>
@@ -263,7 +274,6 @@ function Home({ user, onLogout }) {
                 </div>
                 
                 <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                   {/* Search */}
                    <div style={{position:'relative'}}>
                         <FaSearch style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
                         <input 
@@ -276,7 +286,6 @@ function Home({ user, onLogout }) {
                         />
                    </div>
 
-                   {/* --- NÚT CHUÔNG THÔNG BÁO --- */}
                    <div style={{position: 'relative', cursor: 'pointer'}} onClick={handleBellClick}>
                         <div style={{
                             width: '36px', height: '36px', 
@@ -353,7 +362,6 @@ function Home({ user, onLogout }) {
             </div>
         </main>
 
-        {/* 3. RIGHT SIDEBAR */}
         <aside className="right-sidebar">
             <div>
                 <div className="right-section-title">PROFILE</div>
@@ -413,15 +421,12 @@ function Home({ user, onLogout }) {
 
       </div>
 
-      {/* --- CÁC MODALS --- */}
-      
       <AddTaskModal
         isOpen={isAddingTask} onClose={() => setIsAddingTask(false)} onSubmit={handleAddTask}
         title={newTaskTitle} setTitle={setNewTaskTitle}
         description={newTaskDescription} setDescription={setNewTaskDescription}
         priority={newTaskPriority} setPriority={setNewTaskPriority}
         deadline={newTaskDeadline} setDeadline={setNewTaskDeadline}
-        // Truyền props cho dự án & assignee (GIỜ ĐÃ CÓ STATE ĐỂ TRUYỀN)
         projectId={newTaskProjectId} setProjectId={setNewTaskProjectId}
         assigneeId={newTaskAssigneeId} setAssigneeId={setNewTaskAssigneeId}
         currentUserId={user?.id}

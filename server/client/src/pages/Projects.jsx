@@ -4,6 +4,7 @@ import io from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import ProjectCard from '../components/ProjectCard';
 import AddProjectModal from '../components/AddProjectModal';
+import ChatWidget from '../components/ChatWidget';
 
 import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
 
@@ -228,6 +229,10 @@ export default function Projects({ user, onLogout }) {
         </aside>
 
       </div>
+      <ChatWidget 
+                user={user} 
+                API_URL={API_URL} 
+            />
 
       {/* --- MODALS --- */}
       <AddProjectModal
