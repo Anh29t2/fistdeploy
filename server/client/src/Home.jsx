@@ -47,9 +47,13 @@ function Home({ user, onLogout }) {
 
     try {
         const response = await fetch(url, { ...options, headers });
-        if (response.status === 401 || response.status === 403) {
-            toast.error("Hết phiên đăng nhập!"); onLogout(); return null;
-        }
+       if (response.status === 401 || response.status === 403) {
+        toast.error("Hết phiên đăng nhập!", {
+            toastId: 'session-expired' // ID duy nhất, library sẽ tự check trùng
+        });
+        onLogout(); 
+        return null;
+    }
         return response;
     } catch (error) { console.error(error); return null; }
   };
@@ -80,7 +84,6 @@ function Home({ user, onLogout }) {
     const socket = io(API_URL);
     
     socket.on('connect', () => {
-        console.log("🟢 Socket Connected:", socket.id);
         socket.emit('register_user', String(user.id)); 
     });
     

@@ -39,7 +39,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }) {
 
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/auth/change-password`, {
+      const response = await fetch(`${API_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +63,11 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }) {
         onClose();
         if (onSuccess) onSuccess();
       } else {
-        toast.error(data.message || 'Lỗi đổi mật khẩu!');
+        if(response.status === 400 || respone.status === 401){
+          toast.error(data.message || 'Mật khẩu cũ không chính xác!');
+        } else {
+          toast.error(data.message || 'Lỗi đổi mật khẩu!');
+        }
       }
     } catch (error) {
       console.error('Error:', error);

@@ -8,7 +8,8 @@ import EditTaskModal from '../components/EditTaskModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import MembersModal from '../components/MembersModal';
 import ChatWidget from '../components/ChatWidget';
-import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers } from "react-icons/fa";
+import ChangePasswordModal from '../components/ChangePasswordModal';
+import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers, FaKey } from "react-icons/fa";
 
 export default function ProjectDetail({ user, onLogout }) {
   const { projectId } = useParams();
@@ -29,6 +30,7 @@ export default function ProjectDetail({ user, onLogout }) {
   const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const API_URL = 'http://localhost:3000';
 
@@ -42,8 +44,13 @@ export default function ProjectDetail({ user, onLogout }) {
     try {
         const response = await fetch(url, { ...options, headers });
         if (response.status === 401 || response.status === 403) {
-            toast.error("Hết phiên đăng nhập!"); onLogout(); return null;
-        }
+        // Thêm option toastId để ngăn trùng lặp
+        toast.error("Hết phiên đăng nhập!", {
+            toastId: 'session-expired' // ID duy nhất, library sẽ tự check trùng
+        });
+        onLogout(); 
+        return null;
+    }
         return response;
     } catch (error) { console.error("Lỗi mạng:", error); return null; }
   };
@@ -230,6 +237,11 @@ export default function ProjectDetail({ user, onLogout }) {
                 </div>
             </nav>
             <div className="sidebar-footer">
+                <div className="menu-item" onClick={() => setIsChangePasswordOpen(true)}>
+                    <span className="menu-icon"><FaKey size={18} /></span>
+                    <span className="menu-text">Đổi mật khẩu</span>
+                </div>
+                
                 <div className="menu-item" onClick={onLogout} style={{color: '#e05d5d'}}>
                     <span className="menu-icon"><FaSignOutAlt size={18} /></span>
                     <span className="menu-text">Đăng xuất</span>
@@ -316,6 +328,12 @@ export default function ProjectDetail({ user, onLogout }) {
         </aside>
 
       </div>
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen} 
+        onClose={() => setIsChangePasswordOpen(false)} 
+        onSuccess={() => {}} 
+      />
+      
       <ChatWidget 
           user={user} 
           projectId={projectId} 
