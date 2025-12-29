@@ -21,6 +21,11 @@ export default function ChatWidget({ user, projectId, API_URL }) {
   // Giúp socket đọc được giá trị mới nhất mà không cần reconnect
   const stateRef = useRef({ isOpen, currentProjectId, privatePartner, user, myProjects });
 
+  const authFetch = async (url) => {
+    const token = localStorage.getItem('access_token');
+    return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  }
+
   // Cập nhật Ref mỗi khi State thay đổi
   useEffect(() => {
       stateRef.current = { isOpen, currentProjectId, privatePartner, user, myProjects };
@@ -40,7 +45,7 @@ export default function ChatWidget({ user, projectId, API_URL }) {
       }
       if (isNaN(date.getTime())) return "";
       return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
+    };
 
   // Auto scroll khi có tin nhắn mới hoặc mở tab
   useEffect(() => {
@@ -51,63 +56,76 @@ export default function ChatWidget({ user, projectId, API_URL }) {
   useEffect(() => {
     if (!user?.id) return;
 
-    // Khởi tạo kết nối
     socketRef.current = io(API_URL, { transports: ['websocket'] });
-    
-    // Đăng ký user
-    socketRef.current.emit('register_user', String(user.id));
 
-    // Lắng nghe tin nhắn (Xử lý cả Chat & Toast ở đây)
+    // Tự động Join lại phòng khi mạng chập chờn (Reconnect)
+    socketRef.current.on('connect', () => {
+        socketRef.current.emit('register_user', String(user.id));
+        
+        // --- [SỬA 1: JOIN TẤT CẢ PHÒNG KHI RECONNECT] ---
+        // Lấy danh sách dự án hiện có trong Ref và join lại hết
+        const { myProjects, currentProjectId } = stateRef.current;
+        
+        if (myProjects && myProjects.length > 0) {
+            myProjects.forEach(p => {
+                socketRef.current.emit('join_project', p.id);
+            });
+        }
+        
+        // Nếu đang mở 1 dự án cụ thể thì join lại lần nữa cho chắc
+        if (currentProjectId) {
+            socketRef.current.emit('join_project', currentProjectId);
+        }
+    });
+    
+    // Lắng nghe tin nhắn mới
     socketRef.current.on('receive_message', (newMsg) => {
         const { isOpen, currentProjectId, privatePartner, user, myProjects } = stateRef.current;
         const msgWithTime = { ...newMsg, created_at: newMsg.created_at || new Date().toISOString() };
 
-        // Logic kiểm tra: Tin nhắn này có thuộc về màn hình chat đang mở không?
         let isRelevant = false;
-
-        // TH1: Đang chat riêng
         if (privatePartner) {
-            isRelevant = 
-                (String(newMsg.senderId) === String(privatePartner.id)) || 
-                (String(newMsg.senderId) === String(user.id) && String(newMsg.receiverId) === String(privatePartner.id));
+            isRelevant = (String(newMsg.senderId) === String(privatePartner.id)) || 
+                         (String(newMsg.senderId) === String(user.id) && String(newMsg.receiverId) === String(privatePartner.id));
         } 
-        // TH2: Đang chat chung dự án
         else if (currentProjectId) {
-            // Tin nhắn phải thuộc project này VÀ không phải tin nhắn riêng
             isRelevant = (String(newMsg.projectId) === String(currentProjectId)) && !newMsg.receiverId;
         }
 
-        // QUYẾT ĐỊNH: Update State hay hiện Toast
+        // A. Nếu đang mở màn hình chat CỦA DỰ ÁN ĐÓ -> Thêm tin nhắn
         if (isOpen && isRelevant) {
-            // Nếu đang mở đúng cửa sổ -> Thêm vào list
             setMessages((prev) => [...prev, msgWithTime]);
             setTimeout(scrollToBottom, 100);
-        } else {
-            // Nếu đang đóng, hoặc đang chat người khác -> Hiện Toast
+        } 
+        // B. Nếu đang đóng chat, HOẶC đang ở trang Home/Projects (isRelevant = false) -> Hiện Toast
+        else {
             if (String(newMsg.senderId) !== String(user.id)) {
+                const uniqueToastId = `msg-${new Date().getTime()}-${Math.random()}`;
+
                 if(newMsg.projectId){
                     const project = myProjects.find(p => String(p.id) === String(newMsg.projectId));
-                    const projectName = project ? project.name : 'nhóm dự án';
-                    toast.info(` ${newMsg.senderName || 'Ai đó'} đã nhắn tin trong ${projectName}`, {
+                    const projectName = project ? project.name : 'Nhóm Dự Án';
+                    
+                    toast.info(` ${newMsg.senderName || 'Ai đó'} nhắn vào ${projectName}`, {
                         position: "top-right",
                         autoClose: 4000,
-                        toastId: `msg-${newMsg.id || new Date().getTime()}` // Tránh trùng lặp
+                        toastId: uniqueToastId
                     });
                 } else {
-                toast.info(` ${newMsg.senderName || 'Ai đó'} đã nhắn tin cho bạn`, {
-                    position: "top-right",
-                    autoClose: 4000,
-                    toastId: `msg-${newMsg.id || new Date().getTime()}` // Tránh trùng lặp
-                });
+                    toast.info(` ${newMsg.senderName || 'Ai đó'} nhắn tin cho bạn`, {
+                        position: "top-right",
+                        autoClose: 4000,
+                        toastId: uniqueToastId
+                    });
+                }
             }
         }
-    }
     });
-
+    // Cleanup khi thoát trang
     return () => {
-        socketRef.current.disconnect();
+        if(socketRef.current) socketRef.current.disconnect();
     };
-  }, [API_URL, user.id]); // Chỉ phụ thuộc vào user.id
+  }, [API_URL, user.id]);
 
   // 2. LOGIC JOIN ROOM KHI ĐỔI DỰ ÁN (KHÔNG CẦN DISCONNECT SOCKET)
   useEffect(() => {
@@ -153,16 +171,28 @@ export default function ChatWidget({ user, projectId, API_URL }) {
 
   // 3. FETCH PROJECT LIST KHI MỞ WIDGET TỪ TRANG HOME
   useEffect(() => {
-      if (isOpen && !projectId) {
-          const token = localStorage.getItem('access_token');
-          fetch(`${API_URL}/api/projects?user_id=${user.id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-          })
-          .then(res => res.json())
-          .then(data => { if(Array.isArray(data)) setMyProjects(data); })
-          .catch(err => console.error(err));
-      }
-  }, [isOpen, projectId, API_URL, user.id]);
+      if (!user?.id) return;
+      const fetchMyProjects = async () => {
+          try {
+             const res = await authFetch(`${API_URL}/api/projects?user_id=${user.id}`);
+             if(res.ok) {
+                 const data = await res.json();
+                 if(Array.isArray(data)) {
+                     setMyProjects(data);
+                     stateRef.current = { ...stateRef.current, myProjects: data };
+                     
+                     // --- [SỬA 2: JOIN NGAY KHI CÓ DANH SÁCH DỰ ÁN] ---
+                     if (socketRef.current) {
+                         data.forEach(p => {
+                             socketRef.current.emit('join_project', p.id);
+                         });
+                     }
+                 }
+             }
+          } catch(err) { console.error(err); }
+      };
+      fetchMyProjects();
+  }, [API_URL, user.id]);
 
   const startPrivateChat = (partner) => {
     setMessages([]);
