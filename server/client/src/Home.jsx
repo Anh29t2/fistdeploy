@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
-// 1. Import ToastContainer và CSS
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css"; 
-
+import { toast } from "react-toastify";
 import './App.css';
 import io from "socket.io-client";
 import { useNavigate } from 'react-router-dom';
@@ -98,19 +95,19 @@ function Home({ user, onLogout }) {
     });
 
     // 2. TIN NHẮN (CHAT) -> CHỈ HIỆN TOAST, KHÔNG VÀO CHUÔNG
-    socket.on('receive_message', (data) => {
-        // Chỉ hiện Toast nếu người gửi KHÔNG PHẢI là mình
-        if (String(data.senderId) !== String(user.id)) {
-             toast.info(` ${data.senderName || 'Ai đó'} đã nhắn tin cho bạn}`, {
-                position: "top-right",
-                autoClose: 4000,      // Tự đóng sau 4s
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-             });
-        }
-    });
+    // socket.on('receive_message', (data) => {
+    //     // Chỉ hiện Toast nếu người gửi KHÔNG PHẢI là mình
+    //     if (String(data.senderId) !== String(user.id)) {
+    //          toast.info(` ${data.senderName || 'Ai đó'} đã nhắn tin cho bạn`, {
+    //             position: "top-right",
+    //             autoClose: 4000,      // Tự đóng sau 4s
+    //             hideProgressBar: false,
+    //             closeOnClick: true,
+    //             pauseOnHover: true,
+    //             draggable: true,
+    //          });
+    //     }
+    // });
     
     return () => { socket.disconnect(); };
   }, [user]);
@@ -229,12 +226,6 @@ function Home({ user, onLogout }) {
 
   return (
     <>
-      {/* 2. [QUAN TRỌNG] Thêm ToastContainer vào đây để popup hiện ra */}
-      <ToastContainer 
-        position="top-right"
-        autoClose={3000}
-      />
-
       <div className="app-container">
         
         <aside className="sidebar">
