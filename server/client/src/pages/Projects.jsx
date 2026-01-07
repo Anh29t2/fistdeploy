@@ -6,6 +6,7 @@ import ProjectCard from '../components/ProjectCard';
 import AddProjectModal from '../components/AddProjectModal';
 import ChatWidget from '../components/ChatWidget';
 import ChangePasswordModal from "../components/ChangePasswordModal";
+import Notification from '../components/Notification';
 
 import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
 
@@ -16,7 +17,6 @@ export default function Projects({ user, onLogout }) {
   const [deletingProject, setDeletingProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Form state
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [newProjectDeadline, setNewProjectDeadline] = useState('');
@@ -34,18 +34,14 @@ export default function Projects({ user, onLogout }) {
     try {
       const response = await fetch(url, { ...options, headers });
       if (response.status === 401 || response.status === 403) {
-      // Thêm option toastId để ngăn trùng lặp
-      toast.error("Hết phiên đăng nhập!", {
-          toastId: 'session-expired' // ID duy nhất, library sẽ tự check trùng
-      });
-      onLogout(); 
-      return null;
-  }
+        toast.error("Hết phiên đăng nhập!", { toastId: 'session-expired' });
+        onLogout(); 
+        return null;
+      }
       return response;
     } catch (error) { console.error("Lỗi mạng:", error); return null; }
   };
 
-  // Lấy danh sách projects
   const fetchProjects = async () => {
     if (!user?.id) return;
     const response = await authenticatedFetch(`${API_URL}/api/projects?user_id=${user.id}`);
@@ -56,13 +52,19 @@ export default function Projects({ user, onLogout }) {
   };
 
   useEffect(() => {
-    if (user?.id) fetchProjects();
+    if (user?.id) {
+      fetchProjects();
+    }
     const socket = io(API_URL);
+    socket.on('connect', () =>{
+        socket.emit('register_user', String(user.id));
+    });
     socket.on('server_update_data', () => fetchProjects());
+    
     return () => socket.disconnect();
   }, [user]);
 
-  // Thêm project mới
+
   const handleAddProject = async (e) => {
     e.preventDefault();
     if (!newProjectName.trim()) { toast.warning('Vui lòng nhập tên project!'); return; }
@@ -82,7 +84,6 @@ export default function Projects({ user, onLogout }) {
     } else { toast.error('Lỗi tạo project!'); }
   };
 
-  // Xóa project
   const handleDeleteProject = async () => {
     if (!deletingProject) return;
     const response = await authenticatedFetch(`${API_URL}/api/projects/${deletingProject.id}`, { method: 'DELETE' });
@@ -98,28 +99,28 @@ export default function Projects({ user, onLogout }) {
     <>
       <div className="app-container">
         
-        {/* 1. SIDEBAR TRÁI (Giống Home, nhưng Active ở mục Dự án) */}
-        <aside className="sidebar">
-            <div className="sidebar-header">
+        <aside className="sidebar" style={{display: 'flex', flexDirection: 'column', width: '260px', background: '#fff', borderRight: '1px solid #eee'}}>
+            <div className="sidebar-header" style={{padding: '20px', borderBottom: '1px solid #f0f0f0'}}>
                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                  <div style={{width:'32px', height:'32px', background:'#6a11cb', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold'}}>
-                     A
+                  <div style={{width:'36px', height:'36px', background:'#6a11cb', borderRadius:'10px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize:'18px'}}>A</div>
+                  <div>
+                      <div style={{fontWeight:'700', fontSize:'16px', color:'#333'}}>ABCD Work</div>
+                      <div style={{fontSize:'11px', color:'#888'}}>Quản lý dự án</div>
                   </div>
-                  <div style={{fontWeight:'bold', fontSize:'15px', color:'#333'}}>ABCD Board</div>
                </div>
             </div>
 
-            <nav className="sidebar-menu">
+            <nav className="sidebar-menu" style={{padding: '10px 0'}}>
                 <div className="menu-item" onClick={() => navigate('/home')}>
                     <span className="menu-icon"><FaHome size={18} /></span>
                     <span className="menu-text">Trang chủ</span>
                 </div>
-                {/* Active class ở đây */}
-                <div className="menu-item active">
+                <div className="menu-item active" style={{padding: '12px 20px', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', background:'#f0f7ff', color:'#0052cc', fontWeight:'600', borderRight:'3px solid #0052cc'}}>
                     <span className="menu-icon"><FaProjectDiagram size={18} /></span>
                     <span className="menu-text">Dự án</span>
                 </div>
             </nav>
+
             <div className="sidebar-footer">
                 <div className="menu-item" onClick={() => setIsChangePasswordOpen(true)}>
                     <span className="menu-icon"><FaKey size={18} /></span>
@@ -132,38 +133,45 @@ export default function Projects({ user, onLogout }) {
             </div>
         </aside>
 
-        {/* 2. MAIN CONTENT (GIỮA) */}
-        <main className="main-content">
-            <header className="main-header">
-                <div>
+        <main className="main-content" style={{paddingRight: '20px'}}>
+            <header className="main-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                
+                <div style={{minWidth: '200px'}}>
                    <h2 style={{margin:0, fontSize: '24px', color: '#172b4d'}}>Projects</h2>
                    <small style={{color:'#6b778c'}}>Quản lý các dự án của bạn</small>
                 </div>
                 
-                <div style={{display:'flex', gap:'10px'}}>
-                   <div style={{position:'relative'}}>
-                        <FaSearch style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
+                <div style={{flex: 1, display: 'flex', justifyContent: 'center', margin: '0 20px'}}>
+                   <div style={{position:'relative', width: '100%', maxWidth: '400px'}}>
+                        <FaSearch style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
                         <input 
-                            type="text" 
-                            placeholder="Tìm dự án..." 
-                            className="control-input"
-                            style={{padding: '8px 12px 8px 35px', fontSize: '14px', width: '220px'}}
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)} 
+                            type="text" placeholder="Tìm dự án..." className="control-input"
+                            style={{
+                                padding: '10px 12px 10px 38px', fontSize: '14px', width: '100%', 
+                                borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f9fafb'
+                            }}
+                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
                         />
                    </div>
+                </div>
+
+                <div style={{display:'flex', alignItems:'center', gap:'10px', minWidth: '200px', justifyContent: 'flex-end'}}>
                    <button 
-                       className="btn-add" 
-                       onClick={() => setIsAddingProject(true)}
-                       style={{padding: '8px 16px', fontSize: '14px', display:'flex', alignItems:'center', gap:'5px'}}
+                       className="btn-add" onClick={() => setIsAddingProject(true)}
+                       style={{
+                           padding: '10px 20px', fontSize: '14px', display:'flex', alignItems:'center', gap:'8px',
+                           background: '#0052cc', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
+                       }}
                    >
                        <FaPlus /> Tạo mới
                    </button>
+
+                   <Notification user={user} API_URL={API_URL} />
+
                 </div>
             </header>
 
             <div className="content-scroll-area">
-                {/* Grid Projects */}
                 {filteredProjects.length === 0 ? (
                   <div style={{textAlign:'center', marginTop:'50px', color:'#999'}}>
                     <p style={{ fontSize: '16px' }}>
@@ -184,84 +192,13 @@ export default function Projects({ user, onLogout }) {
                 )}
             </div>
         </main>
-
-        {/* 3. RIGHT SIDEBAR (THỐNG KÊ DỰ ÁN) */}
-        <aside className="right-sidebar">
-            {/* User Profile */}
-            <div>
-                <div className="right-section-title">PROFILE</div>
-                <div style={{display:'flex', alignItems:'center', gap:'12px', paddingBottom:'20px', borderBottom:'1px solid #eee'}}>
-                    <div style={{
-                        width:'40px', height:'40px', borderRadius:'50%', background:'#0052cc', color:'white', 
-                        display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize: '16px'
-                    }}>
-                        {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
-                    </div>
-                    <div>
-                        <div style={{fontWeight:'600', color:'#172b4d'}}>{user?.name}</div>
-                        {/* <div style={{fontSize:'12px', color:'#5e6c84'}}>{user?.email}</div> */}
-                    </div>
-                </div>
-            </div>
-
-            {/* Thống kê Projects */}
-            <div>
-                <div className="right-section-title" style={{marginTop: '20px'}}>THỐNG KÊ DỰ ÁN</div>
-                <div className="info-card">
-                    <div className="stats-row" style={{marginBottom:'15px'}}>
-                        <span className="stats-label" style={{fontSize:'14px'}}>Tổng số dự án</span>
-                        <span className="stats-value" style={{fontSize:'18px', color:'#0052cc'}}>{projects.length}</span>
-                    </div>
-                    
-                    <div className="progress-bar-mini" style={{marginBottom:'15px'}}>
-                        <div className="progress-fill" style={{width: '100%'}}></div>
-                    </div>
-
-                    <p style={{fontSize:'12px', color:'#666'}}>
-                        Bạn đang tham gia {projects.length} dự án. Hãy giữ tiến độ tốt nhé!
-                    </p>
-                </div>
-            </div>
-
-            {/* Hoạt động gần đây */}
-            <div>
-                <div className="right-section-title" style={{marginTop: '20px'}}>HOẠT ĐỘNG</div>
-                <div className="info-card">
-                    <div style={{display:'flex', gap:'10px', alignItems:'start'}}>
-                        <span style={{fontSize:'16px'}}>✨</span>
-                        <div>
-                            <h4 style={{marginBottom: '4px'}}>Mẹo nhỏ</h4>
-                            <p style={{fontSize: '12px'}}>Bạn có thể mời thêm thành viên vào dự án để cùng làm việc.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </aside>
       
-      <ChangePasswordModal
-        isOpen={isChangePasswordOpen} 
-        onClose={() => setIsChangePasswordOpen(false)} 
-        onSuccess={() => {}} 
-      />
-
-
       </div>
-      <ChatWidget 
-                user={user} 
-                API_URL={API_URL} 
-            />
-
-      {/* --- MODALS --- */}
-      <AddProjectModal
-        isOpen={isAddingProject}
-        onClose={() => setIsAddingProject(false)}
-        onSubmit={handleAddProject}
-        name={newProjectName} setName={setNewProjectName}
-        description={newProjectDescription} setDescription={setNewProjectDescription}
-        deadline={newProjectDeadline} setDeadline={setNewProjectDeadline}
-      />
-
-      {/* Modal Xóa Xác Nhận - Dùng style inline hoặc class modal-delete-confirm đã có */}
+      
+      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} />
+      <ChatWidget user={user} API_URL={API_URL} />
+      <AddProjectModal isOpen={isAddingProject} onClose={() => setIsAddingProject(false)} onSubmit={handleAddProject} name={newProjectName} setName={setNewProjectName} description={newProjectDescription} setDescription={setNewProjectDescription} deadline={newProjectDeadline} setDeadline={setNewProjectDeadline} />
+      
       {deletingProject && (
         <div className="modal-overlay" onClick={() => setDeletingProject(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', alignItems:'center' }}>

@@ -8,8 +8,9 @@ import AddTaskModal from "./components/AddTaskModal";
 import EditTaskModal from "./components/EditTaskModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
-import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus, FaBell } from "react-icons/fa";
+import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
 import ChatWidget from "./components/ChatWidget";
+import Notification from "./components/Notification";
 
 function Home({ user, onLogout }) {
   const navigate = useNavigate();
@@ -17,9 +18,6 @@ function Home({ user, onLogout }) {
   const [tasks, setTasks] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-  
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -67,10 +65,10 @@ function Home({ user, onLogout }) {
   useEffect(() => {
     if(user?.id) {
         fetchTasks(); 
-        authenticatedFetch(`${API_URL}/api/notifications`)
-            .then(res => res.json())
-            .then(data => { if(Array.isArray(data)) setNotifications(data); })
-            .catch(err => console.error("Lỗi tải thông báo:", err));
+        // authenticatedFetch(`${API_URL}/api/notifications`)
+        //     .then(res => res.json())
+        //     .then(data => { if(Array.isArray(data)) setNotifications(data); })
+        //     .catch(err => console.error("Lỗi tải thông báo:", err));
     }
   }, [user]);
 
@@ -89,10 +87,10 @@ function Home({ user, onLogout }) {
     });
 
     // 1. THÔNG BÁO HỆ THỐNG (Task, Deadline...) -> Vẫn vào Chuông + Toast
-    socket.on('new_notification', (newNotif) => {
-        setNotifications(prev => [newNotif, ...prev]);
-        toast.info(`🔔 ${newNotif.content}`); 
-    });
+    // socket.on('new_notification', (newNotif) => {
+    //     setNotifications(prev => [newNotif, ...prev]);
+    //     toast.info(`🔔 ${newNotif.content}`); 
+    // });
 
     // 2. TIN NHẮN (CHAT) -> CHỈ HIỆN TOAST, KHÔNG VÀO CHUÔNG
     // socket.on('receive_message', (data) => {
@@ -112,29 +110,30 @@ function Home({ user, onLogout }) {
     return () => { socket.disconnect(); };
   }, [user]);
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+//   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  const handleBellClick = () => {
-      setShowNotifDropdown(!showNotifDropdown);
-      if (!showNotifDropdown && unreadCount > 0) {
-          setNotifications(prev => prev.map(n => ({...n, is_read: 1}))); 
-          authenticatedFetch(`${API_URL}/api/notifications/read-all`, { method: 'PUT' }); 
-      }
-  };
+//   const handleBellClick = () => {
+//       setShowNotifDropdown(!showNotifDropdown);
+//       if (!showNotifDropdown && unreadCount > 0) {
+//           setNotifications(prev => prev.map(n => ({...n, is_read: 1}))); 
+//           authenticatedFetch(`${API_URL}/api/notifications/read-all`, { method: 'PUT' }); 
+//       }
+//   };
 
-  const handleNotificationClick = (notif) => {
-      if (notif.link) {
-          navigate(notif.link);
-          setShowNotifDropdown(false);
-      }
-  };
+//   const handleNotificationClick = (notif) => {
+//       if (notif.link) {
+//           navigate(notif.link);
+//           setShowNotifDropdown(false);
+//       }
+//   };
 
-  const formatNotifTime = (dateString) => {
-      if (!dateString) return "";
-      return new Date(dateString).toLocaleString('vi-VN', { 
-          hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' 
-      });
-  };
+//   const formatNotifTime = (dateString) => {
+//       if (!dateString) return "";
+//       const date = new Date(dateString.endsWith("Z") ? dateString : dateString + "Z");
+//       return date.toLocaleString('vi-VN', { 
+//           hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' 
+//       });
+//   };
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
@@ -261,90 +260,62 @@ function Home({ user, onLogout }) {
         </aside>
 
         <main className="main-content">
-            <header className="main-header">
-                <div>
+            <header className="main-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                
+                {/* 1. BÊN TRÁI: Tiêu đề & Slogan */}
+                <div style={{minWidth: '200px'}}>
                    <h2 style={{margin:0, fontSize: '24px', color: '#172b4d'}}>Your Work</h2>
                    <small style={{color:'#6b778c'}}>Các công việc gần đây</small>
                 </div>
                 
-                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                   <div style={{position:'relative'}}>
-                        <FaSearch style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
+                {/* 2. Ở GIỮA: Thanh tìm kiếm (Căn giữa màn hình) */}
+                <div style={{flex: 1, display: 'flex', justifyContent: 'center', margin: '0 20px'}}>
+                   <div style={{position:'relative', width: '100%', maxWidth: '400px'}}>
+                        <FaSearch style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
                         <input 
                             type="text" 
                             placeholder="Tìm nhanh..." 
                             className="control-input"
-                            style={{padding: '8px 12px 8px 35px', fontSize: '14px', width: '200px'}}
+                            style={{
+                                padding: '10px 12px 10px 38px', 
+                                fontSize: '14px', 
+                                width: '100%', // Để input giãn hết khung chứa maxWidth
+                                borderRadius: '8px',
+                                border: '1px solid #e0e0e0',
+                                background: '#f9fafb'
+                            }}
                             value={searchTerm} 
                             onChange={(e) => setSearchTerm(e.target.value)} 
                         />
                    </div>
+                </div>
 
-                   <div style={{position: 'relative', cursor: 'pointer'}} onClick={handleBellClick}>
-                        <div style={{
-                            width: '36px', height: '36px', 
-                            background: showNotifDropdown ? '#e6f0ff' : 'white', 
-                            borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: '1px solid #ddd', transition: 'all 0.2s'
-                        }}>
-                             <FaBell size={18} color={showNotifDropdown ? '#0052cc' : '#555'} />
-                        </div>
-                        
-                        {unreadCount > 0 && (
-                            <span style={{
-                                position: 'absolute', top: -2, right: -2,
-                                background: '#e05d5d', color: 'white', fontSize: '10px', fontWeight: 'bold',
-                                width: '16px', height: '16px', borderRadius: '50%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: '2px solid white'
-                            }}>
-                                {unreadCount > 9 ? '9+' : unreadCount}
-                            </span>
-                        )}
-
-                        {showNotifDropdown && (
-                            <div style={{
-                                position: 'absolute', right: -60, top: 45, width: '320px',
-                                background: 'white', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                                borderRadius: '12px', zIndex: 1000, overflow: 'hidden', border: '1px solid #eee'
-                            }} onClick={(e) => e.stopPropagation()}>
-                                <div style={{padding: '12px 16px', borderBottom: '1px solid #eee', fontWeight: 'bold', fontSize: '15px', color:'#333', background:'#fafafa'}}>
-                                    Thông báo
-                                </div>
-                                <div style={{maxHeight: '350px', overflowY: 'auto'}}>
-                                    {notifications.length === 0 ? (
-                                        <p style={{padding: '30px', textAlign: 'center', color: '#999', fontSize: '13px'}}>Chưa có thông báo nào</p>
-                                    ) : (
-                                        notifications.map((notif, idx) => (
-                                            <div key={idx} 
-                                                 onClick={() => handleNotificationClick(notif)}
-                                                 style={{
-                                                    padding: '12px 16px', 
-                                                    borderBottom: '1px solid #f5f5f5',
-                                                    background: notif.is_read ? 'white' : '#f0f7ff',
-                                                    cursor: 'pointer',
-                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px'
-                                                 }}
-                                                 onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-                                                 onMouseLeave={(e) => e.currentTarget.style.background = notif.is_read ? 'white' : '#f0f7ff'}
-                                            >
-                                                <div style={{flex: 1, fontSize: '13px', color: '#333', lineHeight: '1.4'}}>
-                                                    {notif.content}
-                                                </div>
-                                                <div style={{fontSize: '11px', color: '#999', whiteSpace: 'nowrap', marginTop: '2px'}}>
-                                                    {formatNotifTime(notif.created_at)}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                   </div>
-
-                   <button className="btn-add" onClick={() => setIsAddingTask(true)} style={{padding: '8px 16px', fontSize: '14px', display:'flex', alignItems:'center', gap:'5px'}}>
+                {/* 3. BÊN PHẢI: Nút Tạo mới -> Rồi đến Thông báo */}
+                <div style={{display:'flex', alignItems:'center', gap:'15px', minWidth: '200px', justifyContent: 'flex-end'}}>
+                   
+                   {/* Nút Tạo Mới (Đưa lên trước) */}
+                   <button 
+                        className="btn-add" 
+                        onClick={() => setIsAddingTask(true)} 
+                        style={{
+                            padding: '10px 20px', 
+                            fontSize: '14px', 
+                            display:'flex', 
+                            alignItems:'center', 
+                            gap:'8px',
+                            background: '#0052cc',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                        }}
+                   >
                        <FaPlus /> Tạo mới
                    </button>
+
+                   {/* Chuông Thông Báo (Đưa xuống cuối) */}
+                   <Notification user = {user} API_URL = {API_URL} />
                 </div>
             </header>
 
@@ -355,63 +326,6 @@ function Home({ user, onLogout }) {
                 />
             </div>
         </main>
-
-        <aside className="right-sidebar">
-            <div>
-                <div className="right-section-title">PROFILE</div>
-                <div style={{display:'flex', alignItems:'center', gap:'12px', paddingBottom:'20px', borderBottom:'1px solid #eee'}}>
-                    <div style={{
-                        width:'40px', height:'40px', borderRadius:'50%', background:'#0052cc', color:'white', 
-                        display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize: '16px'
-                    }}>
-                        {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
-                    </div>
-                    <div>
-                        <div style={{fontWeight:'600', color:'#172b4d'}}>{user?.name}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <div className="right-section-title" style={{marginTop: '20px'}}>TIẾN ĐỘ CÔNG VIỆC</div>
-                <div className="info-card">
-                    <div className="stats-row">
-                        <span className="stats-label">Hoàn thành</span>
-                        <span className="stats-value">{completionRate}%</span>
-                    </div>
-                    <div className="progress-bar-mini">
-                        <div className="progress-fill" style={{width: `${completionRate}%`}}></div>
-                    </div>
-                    <div style={{marginTop:'15px', display:'flex', flexDirection:'column', gap:'8px'}}>
-                        <div className="stats-row">
-                            <span className="stats-label">Tổng số việc</span>
-                            <span className="stats-value">{stats.total}</span>
-                        </div>
-                        <div className="stats-row">
-                            <span className="stats-label">🔥 Đang làm</span>
-                            <span className="stats-value">{stats.processing}</span>
-                        </div>
-                        <div className="stats-row">
-                            <span className="stats-label">⏳ Chờ xử lý</span>
-                            <span className="stats-value">{stats.pending}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <div className="right-section-title" style={{marginTop: '20px'}}>CẬP NHẬT GẦN ĐÂY</div>
-                <div className="info-card" style={{marginBottom:'10px'}}>
-                    <div style={{display:'flex', gap:'10px', alignItems:'start'}}>
-                        <span style={{fontSize:'16px'}}>🚀</span>
-                        <div>
-                            <h4 style={{marginBottom: '4px'}}>Dự án ABCD</h4>
-                            <p style={{fontSize: '12px'}}>Bạn có {stats.pending} công việc cần xử lý ngay.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </aside>
 
       </div>
 

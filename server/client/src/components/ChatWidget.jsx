@@ -36,6 +36,7 @@ export default function ChatWidget({ user, projectId, API_URL }) {
   };
 
     const formatTime = (dateString) => {
+        console.log('dateString nhận được:', dateString);
       if (!dateString) return "";
       let date;
       if (typeof dateString === 'string' && !dateString.endsWith('Z')) {

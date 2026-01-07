@@ -49,7 +49,7 @@ function App() {
         <Route path="/" element={ user ? <Navigate to="/projects" /> : <Navigate to="/login" /> } />
 
         {/* Cải tiến: Nếu đã có user thì không cho vào trang Login nữa, đá về Projects luôn */}
-        <Route path="/login" element={ user ? <Navigate to="/projects" /> : <Login onLoginSuccess={handleLoginSuccess} /> } />
+        <Route path="/login" element={ user ? <Navigate to="/home" /> : <Login onLoginSuccess={handleLoginSuccess} /> } />
 
         <Route path="/register" element={ <Register /> } />
 

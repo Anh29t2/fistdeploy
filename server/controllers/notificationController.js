@@ -4,13 +4,23 @@ const connection = require('../config/db');
 exports.getNotifications = async (req, res) => {
     try {
         const userId = req.user.id;
-        // Lấy 20 thông báo mới nhất, sắp xếp mới nhất lên đầu
+        
+        // SỬA: Thay SELECT * bằng việc liệt kê cột và dùng DATE_FORMAT cho created_at
+        // '%Y-%m-%d %H:%i:%s' sẽ trả về chuỗi dạng "2026-01-07 15:30:00"
         const sql = `
-            SELECT * FROM notifications 
+            SELECT 
+                id, 
+                user_id, 
+                content, 
+                link, 
+                is_read, 
+                DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at
+            FROM notifications 
             WHERE user_id = ? 
             ORDER BY created_at DESC 
             LIMIT 20
         `;
+        
         const [rows] = await connection.promise().query(sql, [userId]);
         
         res.json(rows);

@@ -19,7 +19,7 @@ export default function AddTaskModal({
 
   // 1. Load danh sách dự án (Chỉ chạy khi có currentUserId)
   useEffect(() => {
-    if (isOpen && currentUserId) {
+    if (isOpen && currentUserId && setProjectId) { 
        const token = localStorage.getItem('access_token');
        fetch(`${API_URL}/api/projects?user_id=${currentUserId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -30,7 +30,7 @@ export default function AddTaskModal({
        })
        .catch(err => console.error(err));
     }
-  }, [isOpen, currentUserId]);
+  }, [isOpen, currentUserId, setProjectId]);
 
   // 2. Load thành viên khi projectId thay đổi
   useEffect(() => {
@@ -83,41 +83,55 @@ export default function AddTaskModal({
             />
           </div>
 
-          {/* Chỉ hiện phần chọn Dự án nếu các props này được truyền vào */}
-          {setProjectId && setAssigneeId && (
+          {/* --- SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY --- */}
+          {/* Hiển thị dòng này nếu có setProjectId HOẶC setAssigneeId */}
+          {(setProjectId || setAssigneeId) && (
             <div className="modal-row">
-                <div style={{flex: 1}}>
-                    <label>Thuộc Dự Án</label>
-                    <select 
-                        className="modal-input"
-                        style={{width:'100%'}}
-                        value={projectId || ""}
-                        onChange={(e) => setProjectId(e.target.value)}
-                    >
-                        <option value="">-- Cá nhân (Không dự án) --</option>
-                        {projects.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                </div>
                 
-                <div style={{flex: 1}}>
-                    <label>Người thực hiện</label>
-                    <select 
-                        className="modal-input"
-                        style={{width:'100%'}}
-                        value={assigneeId || ""}
-                        onChange={(e) => setAssigneeId(e.target.value)}
-                        disabled={!projectId} 
-                    >
-                        <option value="">-- Chưa giao --</option>
-                        {members.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                    </select>
-                </div>
+                {/* 1. Ô Chọn Dự Án: Chỉ hiện khi có hàm setProjectId (Home) */}
+                {setProjectId && (
+                    <div style={{flex: 1, marginRight: setAssigneeId ? '10px' : '0'}}>
+                        <label>Thuộc Dự Án</label>
+                        <select 
+                            className="modal-input"
+                            style={{width:'100%'}}
+                            value={projectId || ""}
+                            onChange={(e) => setProjectId(e.target.value)}
+                        >
+                            <option value="">-- Cá nhân --</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                
+                {/* 2. Ô Chọn Người Thực Hiện: Hiện khi có setAssigneeId */}
+                {setAssigneeId && (
+                    <div style={{flex: 1}}>
+                        <label>Người thực hiện</label>
+                        <select 
+                            className="modal-input"
+                            style={{width:'100%'}}
+                            value={assigneeId || ""}
+                            onChange={(e) => setAssigneeId(e.target.value)}
+                            // Nếu ở Home mà chưa chọn Project thì disable
+                            disabled={!projectId} 
+                        >
+                            <option value="">-- Chưa giao --</option>
+                            {members.length > 0 ? (
+                                members.map(m => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                ))
+                            ) : (
+                                <option disabled>Không có thành viên (hoặc chưa chọn DA)</option>
+                            )}
+                        </select>
+                    </div>
+                )}
             </div>
           )}
+          {/* ---------------------------------- */}
 
           <div className="form-group">
             <label>Mô Tả</label>

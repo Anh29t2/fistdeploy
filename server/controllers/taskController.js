@@ -13,7 +13,8 @@ exports.getTasks = async (req, res) => {
         // Câu lệnh SELECT chuẩn: Lấy thêm assignee_name và assignee_email
         const selectFields = `
             SELECT t.*, 
-                   p.name as project_name, 
+                   p.name as project_name,
+                   p.owner_id as project_owner_id, 
                    u.name as assignee_name, 
                    u.email as assignee_email
         `;

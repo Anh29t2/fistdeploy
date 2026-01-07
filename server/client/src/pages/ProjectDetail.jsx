@@ -9,7 +9,8 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import MembersModal from '../components/MembersModal';
 import ChatWidget from '../components/ChatWidget';
 import ChangePasswordModal from '../components/ChangePasswordModal';
-import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers, FaKey } from "react-icons/fa";
+import Notification from '../components/Notification';
+import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers, FaKey, FaCheckCircle, FaHourglassHalf, FaFire } from "react-icons/fa";
 
 export default function ProjectDetail({ user, onLogout }) {
   const { projectId } = useParams();
@@ -26,6 +27,7 @@ export default function ProjectDetail({ user, onLogout }) {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDeadline, setNewTaskDeadline] = useState("");
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("");
 
   const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
@@ -33,7 +35,6 @@ export default function ProjectDetail({ user, onLogout }) {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const API_URL = 'http://localhost:3000';
-
   const getToken = () => localStorage.getItem('access_token');
 
   const authenticatedFetch = async (url, options = {}) => {
@@ -44,18 +45,14 @@ export default function ProjectDetail({ user, onLogout }) {
     try {
         const response = await fetch(url, { ...options, headers });
         if (response.status === 401 || response.status === 403) {
-        // Thêm option toastId để ngăn trùng lặp
-        toast.error("Hết phiên đăng nhập!", {
-            toastId: 'session-expired' // ID duy nhất, library sẽ tự check trùng
-        });
-        onLogout(); 
-        return null;
-    }
+            toast.error("Hết phiên đăng nhập!", { toastId: 'session-expired' });
+            onLogout(); 
+            return null;
+        }
         return response;
     } catch (error) { console.error("Lỗi mạng:", error); return null; }
   };
 
-  // --- HÀM QUAN TRỌNG: Format ngày để giữ nguyên giá trị khi gửi đi ---
   const formatDateLocal = (isoString) => {
     if (!isoString) return null;
     const date = new Date(isoString);
@@ -69,7 +66,6 @@ export default function ProjectDetail({ user, onLogout }) {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Lấy thông tin dự án
             const projRes = await authenticatedFetch(`${API_URL}/api/projects?user_id=${user.id}`);
             if (projRes && projRes.ok) {
                 const projects = await projRes.json();
@@ -77,34 +73,66 @@ export default function ProjectDetail({ user, onLogout }) {
                 if (current) setProject(current);
                 else { toast.error('Dự án không tồn tại'); navigate('/projects'); return; }
             }
-
-            // --- SỬA QUAN TRỌNG: Chỉ dùng project_id để lấy toàn bộ task trong dự án ---
             const taskRes = await authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`);
-            // ---------------------------------------------------------------------------
             if (taskRes && taskRes.ok) {
                 const data = await taskRes.json();
                 setTasks(Array.isArray(data) ? data : []);
             }
+            const notifRes = await authenticatedFetch(`${API_URL}/api/notifications`)
+            if(notifRes && notifRes.ok){
+                const notifData = await notifRes.json();
+                if(Array.isArray(notifData)) setNotifications(notifData);
+            }
         } catch (error) { console.error(error); } 
         finally { setLoading(false); }
     };
-
     if (user?.id) fetchData();
 
     const socket = io(API_URL);
+    socket.on('connect', () => {
+        socket.emit('register_user', String(user.id));
+    });
     socket.on('server_update_data', () => {
         authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`)
             .then(res => res.json())
             .then(data => setTasks(Array.isArray(data) ? data : []));
     });
-
+    socket.on('new_notification', (newNotif) => {
+        setNotifications(prev => [newNotif, ...prev]);
+        toast.info(`${newNotif.content}`)
+    });
     return () => socket.disconnect();
   }, [projectId, user]);
 
+//   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  const handleAddTask = async (e) => {
+//   const handleBellClick = () => {
+//     setShowNotifDropdown(!showNotifDropdown);
+//     if(!showNotifDropdown && unreadCount > 0){
+//         setNotifications(prev => prev.map(n => ({...n,is_read: 1})));
+//         authenticatedFetch(`${API_URL}/api/notifications/read-all`, {method: 'PUT'});
+//     }
+//   };
+
+//   const handleNotificationClick = (notif) => {
+//     if(notif.link) {navigate(notif.link); setShowNotifDropdown(false); }
+//   };
+
+//   const formatNotifTime = (dateString) => {
+//       if (!dateString) return "";
+//       const date = new Date(dateString.endsWith("Z") ? dateString : dateString + "Z");
+//       return date.toLocaleString('vi-VN', { 
+//           hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' 
+//       });
+//   };
+
+  
+
+ const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) { toast.warning("Nhập tên công việc!"); return; }
+    
+    // 2. GỬI KÈM assignee_id KHI TẠO TASK
     const response = await authenticatedFetch(`${API_URL}/api/tasks`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -113,13 +141,19 @@ export default function ProjectDetail({ user, onLogout }) {
             title: newTaskTitle, 
             description: newTaskDescription, 
             priority: newTaskPriority, 
-            deadline: newTaskDeadline 
+            deadline: newTaskDeadline,
+            assignee_id: newTaskAssigneeId || null // <--- Thêm dòng này
         }),
     });
+
     if (response && response.ok) {
         toast.success("Thêm thành công!");
-        setNewTaskTitle(""); setNewTaskDescription(""); setIsAddingTask(false);
-        // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
+        // Reset form
+        setNewTaskTitle(""); 
+        setNewTaskDescription(""); 
+        setNewTaskAssigneeId(""); // <--- Reset assignee
+        setIsAddingTask(false);
+        
         const tRes = await authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`);
         const tData = await tRes.json();
         setTasks(tData);
@@ -128,25 +162,19 @@ export default function ProjectDetail({ user, onLogout }) {
 
   const submitEditTask = async () => {
      if (!editingTask) return;
-     
      let deadlineToSend = editingTask.deadline;
      if (deadlineToSend && deadlineToSend.includes('T')) {
          deadlineToSend = formatDateLocal(deadlineToSend);
      }
-
      const response = await authenticatedFetch(`${API_URL}/api/tasks/${editingTask.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            title: editingTask.title, 
-            status: editingTask.status, 
-            priority: editingTask.priority, 
-            deadline: deadlineToSend, 
-            description: editingTask.description 
+            title: editingTask.title, status: editingTask.status, priority: editingTask.priority, 
+            deadline: deadlineToSend, description: editingTask.description, assignee_id: editingTask.assignee_id 
         }),
     });
     if (response && response.ok) {
         toast.success("Cập nhật thành công!"); setEditingTask(null);
-        // --- SỬA TƯƠNG TỰ Ở ĐÂY ---
         const tRes = await authenticatedFetch(`${API_URL}/api/tasks?project_id=${projectId}`);
         setTasks(await tRes.json());
     }
@@ -162,36 +190,25 @@ export default function ProjectDetail({ user, onLogout }) {
 
   const handleDragEnd = async (result) => {
     const { source, destination, draggableId } = result;
-    
-    // 1. Các kiểm tra cơ bản (giữ nguyên)
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
     
     const task = tasks.find(t => t.id == draggableId); 
     if (!task) return;
-    
     const newStatus = destination.droppableId;
     
-    // 2. Cập nhật giao diện ngay lập tức (Optimistic Update)
     const newTasks = tasks.map(t => t.id == draggableId ? { ...t, status: newStatus } : t);
     setTasks(newTasks);
 
-    // 3. Gọi API cập nhật
     const response = await authenticatedFetch(`${API_URL}/api/tasks/${draggableId}`, {
-        method: "PUT", 
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            title: task.title, 
-            description: task.description, 
-            priority: task.priority, 
-            deadline: formatDateLocal(task.deadline), 
-            status: newStatus 
+            title: task.title, description: task.description, priority: task.priority, 
+            deadline: formatDateLocal(task.deadline), status: newStatus, assignee_id: task.assignee_id
         }),
     });
 
-    // 4. --- THÊM ĐOẠN NÀY: Hiển thị Toast ---
     if (response && response.ok) {
-        // Tùy chỉnh thông báo cho thân thiện hơn
         let statusName = "";
         switch(newStatus) {
             case 'pending': statusName = "Chờ xử lý"; break;
@@ -200,11 +217,7 @@ export default function ProjectDetail({ user, onLogout }) {
             default: statusName = newStatus;
         }
         toast.success(`Đã chuyển sang: ${statusName}`);
-    } else {
-        // Nếu lỗi thì báo lỗi và (tuỳ chọn) có thể hoàn tác lại giao diện cũ
-        toast.error("Lỗi khi cập nhật trạng thái!");
-        // setTasks(tasks); // Nếu muốn chặt chẽ thì bỏ comment dòng này để revert lại vị trí cũ
-    }
+    } else { toast.error("Lỗi khi cập nhật trạng thái!"); }
   };
 
   const filteredTasks = tasks.filter(task => task.title.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -215,18 +228,24 @@ export default function ProjectDetail({ user, onLogout }) {
   };
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "";
 
+  // Tính toán thống kê
+  const totalTasks = filteredTasks.length;
+  const completedTasks = columns.completed.items.length;
+  const progressPercent = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
   return (
-    <>
+   <>
       <div className="app-container">
         
-        <aside className="sidebar">
-            <div className="sidebar-header">
+        <aside className="sidebar" style={{display: 'flex', flexDirection: 'column', width: '260px', background: '#fff', borderRight: '1px solid #eee'}}>
+            <div className="sidebar-header" style={{padding: '20px', borderBottom: '1px solid #f0f0f0'}}>
                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                  <div style={{width:'32px', height:'32px', background:'#6a11cb', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold'}}>A</div>
-                  <div style={{fontWeight:'bold', fontSize:'15px', color:'#333'}}>ABCD Board</div>
+                  <div style={{width:'36px', height:'36px', background:'#6a11cb', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize:'18px'}}>A</div>
+                  <div style={{fontWeight:'bold', fontSize:'16px', color:'#333'}}>ABCD Board</div>
                </div>
             </div>
-            <nav className="sidebar-menu">
+            
+            <nav className="sidebar-menu" style={{padding: '10px 0'}}>
                 <div className="menu-item" onClick={() => navigate('/home')}>
                     <span className="menu-icon"><FaHome size={18} /></span>
                     <span className="menu-text">Trang chủ</span>
@@ -236,12 +255,12 @@ export default function ProjectDetail({ user, onLogout }) {
                     <span className="menu-text">Dự án</span>
                 </div>
             </nav>
+
             <div className="sidebar-footer">
                 <div className="menu-item" onClick={() => setIsChangePasswordOpen(true)}>
                     <span className="menu-icon"><FaKey size={18} /></span>
                     <span className="menu-text">Đổi mật khẩu</span>
                 </div>
-                
                 <div className="menu-item" onClick={onLogout} style={{color: '#e05d5d'}}>
                     <span className="menu-icon"><FaSignOutAlt size={18} /></span>
                     <span className="menu-text">Đăng xuất</span>
@@ -249,36 +268,46 @@ export default function ProjectDetail({ user, onLogout }) {
             </div>
         </aside>
 
-        <main className="main-content">
+        <main className="main-content" style={{paddingRight: '20px'}}> 
             {loading || !project ? (
                 <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#666'}}>
-                    <div className="loading-spinner" style={{width: '30px', height: '30px', border: '3px solid #eee', borderTop: '3px solid #6a11cb', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '10px'}}></div>
                     <p>Đang tải dữ liệu...</p>
-                    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
                 </div>
             ) : (
                 <>
-                    <header className="main-header">
-                        <div>
+                    <header className="main-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        
+                        <div style={{minWidth: '200px'}}>
                            <h2 style={{margin:0, fontSize: '24px', color: '#172b4d'}}>{project.name}</h2>
                            <small style={{color:'#6b778c'}}>{project.description || "Không có mô tả"}</small>
                         </div>
                         
-                        <div style={{display:'flex', gap:'10px'}}>
-                           <div style={{position:'relative'}}>
-                                <FaSearch style={{position:'absolute', left:'10px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
+                        <div style={{flex: 1, display: 'flex', justifyContent: 'center', margin: '0 20px'}}>
+                           <div style={{position:'relative', width: '100%', maxWidth: '400px'}}>
+                                <FaSearch style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
                                 <input 
-                                    type="text" placeholder="Tìm việc..." className="control-input"
-                                    style={{padding: '8px 12px 8px 35px', fontSize: '14px', width: '200px'}}
+                                    type="text" placeholder="Tìm việc trong dự án..." className="control-input"
+                                    style={{
+                                        padding: '10px 12px 10px 38px', fontSize: '14px', width: '100%', 
+                                        borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f9fafb'
+                                    }}
                                     value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
                                 />
                            </div>
-                           <button className="btn-add" onClick={() => setIsAddingTask(true)} style={{padding: '8px 16px', fontSize: '14px', display:'flex', alignItems:'center', gap:'5px'}}>
+                        </div>
+
+                        <div style={{display:'flex', alignItems:'center', gap:'10px', minWidth: '200px', justifyContent: 'flex-end'}}>
+                           <button className="btn-add" onClick={() => setIsAddingTask(true)} style={{padding: '10px 20px', fontSize: '14px', display:'flex', alignItems:'center', gap:'8px', background: '#0052cc', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'}}>
                                <FaPlus /> Tạo mới
                            </button>
-                           <button className="btn-member" onClick={() => setIsMembersModalOpen(true)} style={{padding: '8px 16px', fontSize: '14px'}}>
-                               <FaUsers /> Thành viên
+                           
+                           <button className="btn-member" onClick={() => setIsMembersModalOpen(true)} style={{padding: '10px 16px', fontSize: '14px', background:'#f0f0f0', border:'1px solid #ddd', borderRadius:'6px', cursor:'pointer', color:'#333'}}>
+                               <FaUsers />
                            </button>
+
+                           {/* 3. THAY THẾ TOÀN BỘ CODE CHUÔNG CŨ */}
+                           <Notification user={user} API_URL={API_URL} />
+
                         </div>
                     </header>
 
@@ -291,76 +320,21 @@ export default function ProjectDetail({ user, onLogout }) {
                 </>
             )}
         </main>
-
-        <aside className="right-sidebar">
-            {!loading && project && (
-                <>
-                    <div>
-                        <div className="right-section-title">THÔNG TIN</div>
-                        <div className="info-card">
-                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px'}}>
-                                <FaClock style={{color:'#0052cc'}}/> 
-                                <span style={{fontSize:'13px', fontWeight:'600'}}>Hạn chót:</span>
-                            </div>
-                            <div style={{fontSize:'14px', color:'#333', marginLeft:'24px'}}>
-                                {formatDate(project.deadline) || "Chưa đặt lịch"}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div className="right-section-title" style={{marginTop:'20px'}}>THỐNG KÊ</div>
-                        <div className="info-card">
-                            <div className="stats-row">
-                                <span className="stats-label">Tổng task</span>
-                                <span className="stats-value">{filteredTasks.length}</span>
-                            </div>
-                            <div className="progress-bar-mini">
-                                <div className="progress-fill" style={{width: filteredTasks.length > 0 ? (columns.completed.items.length / filteredTasks.length * 100) + '%' : '0%'}}></div>
-                            </div>
-                            <p style={{fontSize:'12px', color:'#666', marginTop:'10px'}}>
-                                Hoàn thành: {columns.completed.items.length}/{filteredTasks.length}
-                            </p>
-                        </div>
-                    </div>
-                </>
-            )}
-        </aside>
-
       </div>
-      <ChangePasswordModal
-        isOpen={isChangePasswordOpen} 
-        onClose={() => setIsChangePasswordOpen(false)} 
-        onSuccess={() => {}} 
-      />
-      
-      <ChatWidget 
-          user={user} 
-          projectId={projectId} 
-          API_URL={API_URL} 
-      />
-      
 
-      <AddTaskModal
-        isOpen={isAddingTask} onClose={() => setIsAddingTask(false)} onSubmit={handleAddTask}
-        title={newTaskTitle} setTitle={setNewTaskTitle} description={newTaskDescription} setDescription={setNewTaskDescription}
-        priority={newTaskPriority} setPriority={setNewTaskPriority} deadline={newTaskDeadline} setDeadline={setNewTaskDeadline}
-      />
-
-      <EditTaskModal
-        isOpen={!!editingTask} onClose={() => setEditingTask(null)} onSubmit={submitEditTask}
-        task={editingTask} setTask={setEditingTask}
-      />
-
-      <DeleteConfirmModal
-        isOpen={!!deletingTask} onClose={() => setDeletingTask(null)} onConfirm={confirmDelete}
-        task={deletingTask}
-      />
-
-      <MembersModal
-        isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)}
-        projectId={projectId} API_URL={API_URL}
-      />
+      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} />
+      <ChatWidget user={user} projectId={projectId} API_URL={API_URL} />
+      <AddTaskModal isOpen={isAddingTask} onClose={() => setIsAddingTask(false)}
+                    onSubmit={handleAddTask} title={newTaskTitle} setTitle={setNewTaskTitle}
+                    description={newTaskDescription} setDescription={setNewTaskDescription}
+                    priority={newTaskPriority} setPriority={setNewTaskPriority}
+                    deadline={newTaskDeadline} setDeadline={setNewTaskDeadline}
+                    projectId={projectId}
+                    assigneeId={newTaskAssigneeId}
+                    setAssigneeId={setNewTaskAssigneeId} />
+      <EditTaskModal isOpen={!!editingTask} onClose={() => setEditingTask(null)} onSubmit={submitEditTask} task={editingTask} setTask={setEditingTask} currentUser={user} />
+      <DeleteConfirmModal isOpen={!!deletingTask} onClose={() => setDeletingTask(null)} onConfirm={confirmDelete} task={deletingTask} />
+      <MembersModal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} projectId={projectId} API_URL={API_URL} />
     </>
   );
 }

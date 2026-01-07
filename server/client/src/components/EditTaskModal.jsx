@@ -1,4 +1,3 @@
-// 🔥 QUAN TRỌNG: Dòng này bắt buộc phải có ở trên cùng
 import React, { useState, useEffect } from 'react';
 import { toast } from "react-toastify";
 
@@ -13,6 +12,7 @@ export default function EditTaskModal({
   // Khai báo state
   const [members, setMembers] = useState([]);
   const [canEdit, setCanEdit] = useState(false);
+  const [isLoadingPermission, setIsLoadingPermission] = useState(true);
   const API_URL = 'http://localhost:3000';
 
   // Hàm format ngày tháng
@@ -26,36 +26,48 @@ export default function EditTaskModal({
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  // Effect 1: Kiểm tra quyền và lấy danh sách thành viên khi mở modal
   useEffect(() => {
     if (isOpen && task && task.project_id) {
-        fetchProjectData();
+        checkPermissionAndFetchData();
     }
-  }, [isOpen, task]);
+  }, [isOpen, task, currentUser]);
 
-  const fetchProjectData = async () => {
+  const checkPermissionAndFetchData = async () => {
+      setIsLoadingPermission(true); // Bắt đầu load -> Ẩn form đi
       try {
           const token = localStorage.getItem('access_token');
           const headers = { 'Authorization': `Bearer ${token}` };
           
-          // Lấy thông tin dự án
-          const resProject = await fetch(`${API_URL}/api/projects/${task.project_id}`, { headers });
-          const projectData = await resProject.json();
+          let hasPermission = false;
 
-          // Lấy danh sách thành viên
+          // CÁCH 1: Check nhanh (Nếu Backend getTasks đã trả về project_owner_id)
+          if (task.project_owner_id && currentUser) {
+              if (String(task.project_owner_id) === String(currentUser.id)) {
+                  hasPermission = true;
+              }
+          } 
+          // CÁCH 2: Check chậm (Gọi API nếu Cách 1 thiếu dữ liệu)
+          else {
+              const resProject = await fetch(`${API_URL}/api/projects/${task.project_id}`, { headers });
+              const rawData = await resProject.json();
+              const projectData = Array.isArray(rawData) ? rawData[0] : rawData;
+              
+              if (projectData && currentUser && String(projectData.owner_id) === String(currentUser.id)) {
+                  hasPermission = true;
+              }
+          }
+
+          setCanEdit(hasPermission);
+
+          // Lấy danh sách thành viên (để hiện dropdown)
           const resMembers = await fetch(`${API_URL}/api/projects/${task.project_id}/members`, { headers });
           const membersData = await resMembers.json();
           if(Array.isArray(membersData)) setMembers(membersData);
 
-          // Logic phân quyền: Chỉ Owner mới được sửa
-          let hasPermission = false;
-          if (projectData && String(projectData.owner_id) === String(currentUser?.id)) {
-              hasPermission = true;
-          }
-          setCanEdit(hasPermission);
-
       } catch (error) {
-          console.error("Lỗi tải dữ liệu dự án:", error);
+          console.error("Lỗi setup modal:", error);
+      } finally {
+          setIsLoadingPermission(false); // Load xong -> Hiện form
       }
   };
 
@@ -111,6 +123,8 @@ export default function EditTaskModal({
               style={{width:'100%'}} 
               value={task.status} 
               onChange={(e) => setTask({...task, status: e.target.value})}
+              // Thường trạng thái thì ai cũng update được để báo tiến độ, bạn có thể bỏ disabled ở đây
+              disabled={!canEdit} 
             >
               <option value="pending">⏳ Chờ xử lý</option>
               <option value="processing">🔥 Đang làm</option>
