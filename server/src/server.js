@@ -7,7 +7,8 @@ const taskRoutes = require('../routes/taskRoutes');
 const projectRouters = require('../routes/projectRoutes.js')
 const messageRoutes = require('../routes/messageRoutes.js');
 const notificationRoutes = require('../routes/notificationRoutes.js');
-const statisticRoutes = require('../routes/statisticRoutes.js')
+const statisticRoutes = require('../routes/statisticRoutes.js');
+const userRoutes = require('../routes/userRoutes.js');
 // Vẫn giữ import này để dùng cho Task, nhưng không dùng cho Message nữa
 const { createNotification } = require('../utils/notificationHelper.js');
 
@@ -20,6 +21,7 @@ app.use(cors());
 app.use(express.json());
 
 const connection = require('../config/db.js');
+const { use } = require('react');
 
 app.use('/api/tasks', taskRoutes);
 app.use('/api/auth',authRouters);
@@ -27,6 +29,8 @@ app.use('/api/projects',projectRouters);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/statistics', statisticRoutes);
+app.use('/api/users', userRoutes);
+app.use('/uploads', express.static('uploads'));
 
 const server = http.createServer(app);
 const io = new Server(server, {
