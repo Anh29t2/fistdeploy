@@ -11,6 +11,7 @@ import ChatWidget from '../components/ChatWidget';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import Notification from '../components/Notification';
 import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers, FaKey, FaCheckCircle, FaHourglassHalf, FaFire } from "react-icons/fa";
+import SideBar from '../components/SideBar';
 
 export default function ProjectDetail({ user, onLogout }) {
   const { projectId } = useParams();
@@ -78,11 +79,6 @@ export default function ProjectDetail({ user, onLogout }) {
                 const data = await taskRes.json();
                 setTasks(Array.isArray(data) ? data : []);
             }
-            const notifRes = await authenticatedFetch(`${API_URL}/api/notifications`)
-            if(notifRes && notifRes.ok){
-                const notifData = await notifRes.json();
-                if(Array.isArray(notifData)) setNotifications(notifData);
-            }
         } catch (error) { console.error(error); } 
         finally { setLoading(false); }
     };
@@ -104,29 +100,6 @@ export default function ProjectDetail({ user, onLogout }) {
     return () => socket.disconnect();
   }, [projectId, user]);
 
-//   const unreadCount = notifications.filter(n => !n.is_read).length;
-
-//   const handleBellClick = () => {
-//     setShowNotifDropdown(!showNotifDropdown);
-//     if(!showNotifDropdown && unreadCount > 0){
-//         setNotifications(prev => prev.map(n => ({...n,is_read: 1})));
-//         authenticatedFetch(`${API_URL}/api/notifications/read-all`, {method: 'PUT'});
-//     }
-//   };
-
-//   const handleNotificationClick = (notif) => {
-//     if(notif.link) {navigate(notif.link); setShowNotifDropdown(false); }
-//   };
-
-//   const formatNotifTime = (dateString) => {
-//       if (!dateString) return "";
-//       const date = new Date(dateString.endsWith("Z") ? dateString : dateString + "Z");
-//       return date.toLocaleString('vi-VN', { 
-//           hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' 
-//       });
-//   };
-
-  
 
  const handleAddTask = async (e) => {
     e.preventDefault();
@@ -237,36 +210,11 @@ export default function ProjectDetail({ user, onLogout }) {
    <>
       <div className="app-container">
         
-        <aside className="sidebar" style={{display: 'flex', flexDirection: 'column', width: '260px', background: '#fff', borderRight: '1px solid #eee'}}>
-            <div className="sidebar-header" style={{padding: '20px', borderBottom: '1px solid #f0f0f0'}}>
-               <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                  <div style={{width:'36px', height:'36px', background:'#6a11cb', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize:'18px'}}>A</div>
-                  <div style={{fontWeight:'bold', fontSize:'16px', color:'#333'}}>ABCD Board</div>
-               </div>
-            </div>
-            
-            <nav className="sidebar-menu" style={{padding: '10px 0'}}>
-                <div className="menu-item" onClick={() => navigate('/home')}>
-                    <span className="menu-icon"><FaHome size={18} /></span>
-                    <span className="menu-text">Trang chủ</span>
-                </div>
-                <div className="menu-item active">
-                    <span className="menu-icon"><FaProjectDiagram size={18} /></span>
-                    <span className="menu-text">Dự án</span>
-                </div>
-            </nav>
-
-            <div className="sidebar-footer">
-                <div className="menu-item" onClick={() => setIsChangePasswordOpen(true)}>
-                    <span className="menu-icon"><FaKey size={18} /></span>
-                    <span className="menu-text">Đổi mật khẩu</span>
-                </div>
-                <div className="menu-item" onClick={onLogout} style={{color: '#e05d5d'}}>
-                    <span className="menu-icon"><FaSignOutAlt size={18} /></span>
-                    <span className="menu-text">Đăng xuất</span>
-                </div>
-            </div>
-        </aside>
+        <SideBar 
+            activePage="projects" 
+            onLogout={onLogout} 
+            onChangePassword={() => setIsChangePasswordOpen(true)}
+        />
 
         <main className="main-content" style={{paddingRight: '20px'}}> 
             {loading || !project ? (

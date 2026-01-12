@@ -7,6 +7,7 @@ import AddProjectModal from '../components/AddProjectModal';
 import ChatWidget from '../components/ChatWidget';
 import ChangePasswordModal from "../components/ChangePasswordModal";
 import Notification from '../components/Notification';
+import SideBar from '../components/SideBar';
 
 import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
 
@@ -33,7 +34,8 @@ export default function Projects({ user, onLogout }) {
 
     try {
       const response = await fetch(url, { ...options, headers });
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
+        // Bỏ 403 ủy quyền
         toast.error("Hết phiên đăng nhập!", { toastId: 'session-expired' });
         onLogout(); 
         return null;
@@ -87,10 +89,19 @@ export default function Projects({ user, onLogout }) {
   const handleDeleteProject = async () => {
     if (!deletingProject) return;
     const response = await authenticatedFetch(`${API_URL}/api/projects/${deletingProject.id}`, { method: 'DELETE' });
-    if (response && response.ok) {
+        if (response && response.ok) {
       toast.success('Xóa project thành công!');
-      setDeletingProject(null); fetchProjects();
-    } else { toast.error('Lỗi xóa project!'); }
+      setDeletingProject(null); 
+      fetchProjects();
+    } 
+    else if (response && response.status === 403) {
+      const data = await response.json();
+      toast.warning(data.message || 'Bạn không có quyền xóa dự án này!');
+      setDeletingProject(null); // Đóng modal lại
+    }
+    else { 
+      toast.error('Lỗi xóa project! Vui lòng thử lại.'); 
+    }
   };
 
   const filteredProjects = projects.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -99,39 +110,11 @@ export default function Projects({ user, onLogout }) {
     <>
       <div className="app-container">
         
-        <aside className="sidebar" style={{display: 'flex', flexDirection: 'column', width: '260px', background: '#fff', borderRight: '1px solid #eee'}}>
-            <div className="sidebar-header" style={{padding: '20px', borderBottom: '1px solid #f0f0f0'}}>
-               <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                  <div style={{width:'36px', height:'36px', background:'#6a11cb', borderRadius:'10px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize:'18px'}}>A</div>
-                  <div>
-                      <div style={{fontWeight:'700', fontSize:'16px', color:'#333'}}>ABCD Work</div>
-                      <div style={{fontSize:'11px', color:'#888'}}>Quản lý dự án</div>
-                  </div>
-               </div>
-            </div>
-
-            <nav className="sidebar-menu" style={{padding: '10px 0'}}>
-                <div className="menu-item" onClick={() => navigate('/home')}>
-                    <span className="menu-icon"><FaHome size={18} /></span>
-                    <span className="menu-text">Trang chủ</span>
-                </div>
-                <div className="menu-item active" style={{padding: '12px 20px', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', background:'#f0f7ff', color:'#0052cc', fontWeight:'600', borderRight:'3px solid #0052cc'}}>
-                    <span className="menu-icon"><FaProjectDiagram size={18} /></span>
-                    <span className="menu-text">Dự án</span>
-                </div>
-            </nav>
-
-            <div className="sidebar-footer">
-                <div className="menu-item" onClick={() => setIsChangePasswordOpen(true)}>
-                    <span className="menu-icon"><FaKey size={18} /></span>
-                    <span className="menu-text">Đổi mật khẩu</span>
-                </div>
-                <div className="menu-item" onClick={onLogout} style={{color: '#e05d5d'}}>
-                    <span className="menu-icon"><FaSignOutAlt size={18} /></span>
-                    <span className="menu-text">Đăng xuất</span>
-                </div>
-            </div>
-        </aside>
+       <SideBar 
+            activePage="projects" 
+            onLogout={onLogout} 
+            onChangePassword={() => setIsChangePasswordOpen(true)}
+        />
 
         <main className="main-content" style={{paddingRight: '20px'}}>
             <header className="main-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
