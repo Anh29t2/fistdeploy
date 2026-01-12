@@ -46,9 +46,18 @@ exports.getProjectById = async (req, res) => {
 exports.createProject = async (req, res) => {
     const { user_id, name, description, deadline } = req.body;
     try {
-        await connection.promise().query(
+        const [result] = await connection.promise().query(
             'INSERT INTO projects (name, description, deadline, owner_id) VALUES (?, ?, ?, ?)',
             [name, description || '', deadline || null, user_id]
+        );
+
+        // Lấy ID của dự án vừa tạo
+        const newProjectId = result.insertId;
+
+        // Thêm chủ dự án vào bảng project_members với vai trò 'owner'
+        await connection.promise().query(
+            'INSERT INTO project_members (project_id, user_id, role) VALUES (?,?,?)',
+            [newProjectId, user_id, 'owner']
         );
         res.status(201).json({ message: 'Tạo dự án thành công!' });
     } catch (error) {
@@ -58,22 +67,35 @@ exports.createProject = async (req, res) => {
 
 // 3. Xóa dự án (xóa toàn bộ tasks bên trong)
 exports.deleteProject = async (req, res) => {
-    const { id } = req.params;
-    const { user_id } = req.body; // Lưu ý: user_id nên lấy từ req.user.id (token) để bảo mật hơn
+    const projectId = req.params.id;
+    const currentUserId = req.user.id; 
+
     try {
-        // Bước 1: Kiểm tra xem dự án này có phải của user_id này không
-        const [projects] = await connection.promise().query(
-            'SELECT id FROM projects WHERE id = ? AND owner_id = ?', 
-            [id, user_id]
+        // 1. SỬA SQL: Lấy cột owner_id thay vì user_id
+        const [rows] = await connection.promise().query(
+            'SELECT owner_id FROM projects WHERE id = ?', 
+            [projectId]
         );
-        if (projects.length === 0) {
-            return res.status(403).json({ message: 'Bạn không có quyền xóa dự án này hoặc dự án không tồn tại!' });
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Dự án không tồn tại!' });
         }
-        // Bước 2: Nếu đúng là Owner thì mới xóa
-        await connection.promise().query('DELETE FROM projects WHERE id = ?', [id]);
-        res.json({ message: 'Đã xóa dự án và toàn bộ công việc bên trong!' });
+
+        const project = rows[0];
+
+        // 2. SỬA LOGIC SO SÁNH: Kiểm tra xem người xóa có phải là owner_id không
+        if (project.owner_id !== currentUserId) {
+            return res.status(403).json({ message: 'Bạn không có quyền xóa dự án này! Chỉ chủ dự án mới được xóa.' });
+        }
+
+        // 3. Thực hiện xóa
+        // (Lưu ý: Nếu xóa vẫn lỗi 500 thì là do chưa chạy lệnh ON DELETE CASCADE ở bước trước)
+        await connection.promise().query('DELETE FROM projects WHERE id = ?', [projectId]);
+        
+        res.json({ message: 'Đã xóa dự án thành công!' });
+
     } catch (error) {
-        console.log("Lỗi khi xóa dự án",error);
+        console.error("Lỗi khi xóa dự án:", error);
         res.status(500).json({ error: error.message });
     }
 };

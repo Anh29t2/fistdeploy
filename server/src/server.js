@@ -7,6 +7,7 @@ const taskRoutes = require('../routes/taskRoutes');
 const projectRouters = require('../routes/projectRoutes.js')
 const messageRoutes = require('../routes/messageRoutes.js');
 const notificationRoutes = require('../routes/notificationRoutes.js');
+const statisticRoutes = require('../routes/statisticRoutes.js')
 // Vẫn giữ import này để dùng cho Task, nhưng không dùng cho Message nữa
 const { createNotification } = require('../utils/notificationHelper.js');
 
@@ -25,6 +26,7 @@ app.use('/api/auth',authRouters);
 app.use('/api/projects',projectRouters);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/statistics', statisticRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {

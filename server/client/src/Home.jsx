@@ -8,9 +8,10 @@ import AddTaskModal from "./components/AddTaskModal";
 import EditTaskModal from "./components/EditTaskModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
-import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
+import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus, FaChartPie } from "react-icons/fa";
 import ChatWidget from "./components/ChatWidget";
 import Notification from "./components/Notification";
+import SideBar from "./components/SideBar";
 
 function Home({ user, onLogout }) {
   const navigate = useNavigate();
@@ -86,54 +87,8 @@ function Home({ user, onLogout }) {
         if (!document.body.classList.contains('is-dragging')) fetchTasks(); 
     });
 
-    // 1. THÔNG BÁO HỆ THỐNG (Task, Deadline...) -> Vẫn vào Chuông + Toast
-    // socket.on('new_notification', (newNotif) => {
-    //     setNotifications(prev => [newNotif, ...prev]);
-    //     toast.info(`🔔 ${newNotif.content}`); 
-    // });
-
-    // 2. TIN NHẮN (CHAT) -> CHỈ HIỆN TOAST, KHÔNG VÀO CHUÔNG
-    // socket.on('receive_message', (data) => {
-    //     // Chỉ hiện Toast nếu người gửi KHÔNG PHẢI là mình
-    //     if (String(data.senderId) !== String(user.id)) {
-    //          toast.info(` ${data.senderName || 'Ai đó'} đã nhắn tin cho bạn`, {
-    //             position: "top-right",
-    //             autoClose: 4000,      // Tự đóng sau 4s
-    //             hideProgressBar: false,
-    //             closeOnClick: true,
-    //             pauseOnHover: true,
-    //             draggable: true,
-    //          });
-    //     }
-    // });
-    
     return () => { socket.disconnect(); };
   }, [user]);
-
-//   const unreadCount = notifications.filter(n => !n.is_read).length;
-
-//   const handleBellClick = () => {
-//       setShowNotifDropdown(!showNotifDropdown);
-//       if (!showNotifDropdown && unreadCount > 0) {
-//           setNotifications(prev => prev.map(n => ({...n, is_read: 1}))); 
-//           authenticatedFetch(`${API_URL}/api/notifications/read-all`, { method: 'PUT' }); 
-//       }
-//   };
-
-//   const handleNotificationClick = (notif) => {
-//       if (notif.link) {
-//           navigate(notif.link);
-//           setShowNotifDropdown(false);
-//       }
-//   };
-
-//   const formatNotifTime = (dateString) => {
-//       if (!dateString) return "";
-//       const date = new Date(dateString.endsWith("Z") ? dateString : dateString + "Z");
-//       return date.toLocaleString('vi-VN', { 
-//           hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' 
-//       });
-//   };
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
@@ -227,37 +182,11 @@ function Home({ user, onLogout }) {
     <>
       <div className="app-container">
         
-        <aside className="sidebar">
-            <div className="sidebar-header">
-               <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                  <div style={{width:'32px', height:'32px', background:'#2f352dff', borderRadius:'8px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold'}}>
-                  </div>
-                  <div style={{ alignItems:'center' , fontWeight:'bold', fontSize:'18px', color:'#333'}}>ABCD Project</div>
-               </div>
-            </div>
-
-            <nav className="sidebar-menu">
-                <div className="menu-item active">
-                    <span className="menu-icon"><FaHome size={18} /></span>
-                    <span className="menu-text">Trang chủ</span>
-                </div>
-                <div className="menu-item" onClick={() => navigate('/projects')}>
-                    <span className="menu-icon"><FaProjectDiagram size={18} /></span>
-                    <span className="menu-text">Dự án</span>
-                </div>
-            </nav>
-
-            <div className="sidebar-footer">
-                <div className="menu-item" onClick={() => setIsChangePasswordOpen(true)}>
-                    <span className="menu-icon"><FaKey size={18} /></span>
-                    <span className="menu-text">Đổi mật khẩu</span>
-                </div>
-                <div className="menu-item" onClick={onLogout} style={{color: '#e05d5d'}}>
-                    <span className="menu-icon"><FaSignOutAlt size={18} /></span>
-                    <span className="menu-text">Đăng xuất</span>
-                </div>
-            </div>
-        </aside>
+        <SideBar
+        activePage="home"
+        onLogout={onLogout}
+        onChangePassword={() => setIsChangePasswordOpen(true)}
+        />
 
         <main className="main-content">
             <header className="main-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>

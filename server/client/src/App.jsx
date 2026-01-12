@@ -5,6 +5,7 @@ import Login from './Login';
 import Home from './Home';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import Statistics from './pages/Statistics';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
@@ -58,7 +59,8 @@ function App() {
         <Route path="/projects" element={ user ? <Projects user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />
 
         <Route path="/projects/:projectId" element={ user ? <ProjectDetail user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />
-      </Routes>
+
+        <Route path="/statistics" element={ user ? <Statistics user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />      </Routes>
     </div>
   );
 }
