@@ -133,19 +133,12 @@ export default function MembersModal({
     };
 
     if(!isOpen) return null;
-
-    // --- LOGIC CHECK QUYỀN HIỂN THỊ ---
     // Tìm xem người đang đăng nhập (currentUser) có phải là Owner của dự án này không
     const ownerOfProject = members.find(m => m.role === 'owner');
     
     // Sử dụng String() để ép kiểu về chuỗi trước khi so sánh, tránh lỗi 1 !== "1"
     const isMeOwner = currentUser && ownerOfProject && String(currentUser.id) === String(ownerOfProject.id);
     
-    console.log("=== DEBUG CHECK QUYỀN ===");
-    console.log("1. User đang đăng nhập (currentUser):", currentUser);
-    console.log("2. Chủ dự án (ownerOfProject):", ownerOfProject);
-    console.log("3. Kết quả isMeOwner:", isMeOwner);
-
     return (
       <>
         <div className="modal-overlay" onClick={onClose}>
