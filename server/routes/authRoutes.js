@@ -13,6 +13,6 @@ router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
 
 // POST /auth/change-password (Cần token)
-router.post('/change-password', authMiddleware, authController.changePassword);
+// router.post('/change-password', authMiddleware, authController.changePassword);
 
 module.exports = router;

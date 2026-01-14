@@ -6,5 +6,7 @@ const upload = require('../middleware/uploadMiddleware'); // File này bạn đ�
 
 // upload.single('avatar') -> Cho phép nhận 1 file từ form có tên là 'avatar'
 router.put('/profile', authMiddleware, upload.single('avatar'), userController.updateProfile);
-
+router.put('/change-password', authMiddleware, userController.changePassword);
 module.exports = router;
+
+

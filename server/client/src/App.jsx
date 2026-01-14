@@ -47,20 +47,30 @@ function App() {
       <ToastContainer position="top-right" autoClose={3000} />
 
       <Routes>
-        <Route path="/" element={ user ? <Navigate to="/projects" /> : <Navigate to="/login" /> } />
+        <Route path="/" element={ user ? <Navigate to="/statistics" /> : <Navigate to="/login" /> } />
 
-        {/* Cải tiến: Nếu đã có user thì không cho vào trang Login nữa, đá về Projects luôn */}
         <Route path="/login" element={ user ? <Navigate to="/home" /> : <Login onLoginSuccess={handleLoginSuccess} /> } />
 
         <Route path="/register" element={ <Register /> } />
+        <Route 
+            path="/home" 
+            element={ user ? <Home user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/login" /> } 
+        />
+        <Route 
+            path="/projects" 
+            element={ user ? <Projects user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/login" /> } 
+        />
 
-        <Route path="/home" element={ user ? <Home user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />
+        <Route 
+            path="/projects/:projectId" 
+            element={ user ? <ProjectDetail user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/login" /> } 
+        />
 
-        <Route path="/projects" element={ user ? <Projects user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />
-
-        <Route path="/projects/:projectId" element={ user ? <ProjectDetail user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />
-
-        <Route path="/statistics" element={ user ? <Statistics user={user} onLogout={handleLogout} /> : <Navigate to="/login" /> } />      </Routes>
+        <Route 
+            path="/statistics" 
+            element={ user ? <Statistics user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/login" /> } 
+        />
+      </Routes>
     </div>
   );
 }

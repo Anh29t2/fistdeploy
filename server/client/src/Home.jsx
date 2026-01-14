@@ -7,13 +7,14 @@ import KanbanBoard from "./components/KanbanBoard";
 import AddTaskModal from "./components/AddTaskModal";
 import EditTaskModal from "./components/EditTaskModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
-import ChangePasswordModal from "./components/ChangePasswordModal";
+// import ChangePasswordModal from "./components/ChangePasswordModal";
+import ProfileModal from "./components/ProfileModal";
 import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus, FaChartPie } from "react-icons/fa";
 import ChatWidget from "./components/ChatWidget";
 import Notification from "./components/Notification";
 import SideBar from "./components/SideBar";
 
-function Home({ user, onLogout }) {
+function Home({ user, onLogout, setUser }) {
   const navigate = useNavigate();
   
   const [tasks, setTasks] = useState([]);
@@ -31,6 +32,7 @@ function Home({ user, onLogout }) {
 
   const [editingTask, setEditingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
+
 
   const API_URL = 'http://localhost:3000';
 
@@ -186,18 +188,17 @@ function Home({ user, onLogout }) {
         activePage="home"
         onLogout={onLogout}
         onChangePassword={() => setIsChangePasswordOpen(true)}
+        user = {user}
         />
 
         <main className="main-content">
             <header className="main-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 
-                {/* 1. BÊN TRÁI: Tiêu đề & Slogan */}
                 <div style={{minWidth: '200px'}}>
                    <h2 style={{margin:0, fontSize: '24px', color: '#172b4d'}}>Your Work</h2>
                    <small style={{color:'#6b778c'}}>Các công việc gần đây</small>
                 </div>
                 
-                {/* 2. Ở GIỮA: Thanh tìm kiếm (Căn giữa màn hình) */}
                 <div style={{flex: 1, display: 'flex', justifyContent: 'center', margin: '0 20px'}}>
                    <div style={{position:'relative', width: '100%', maxWidth: '400px'}}>
                         <FaSearch style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#888'}} />
@@ -208,7 +209,7 @@ function Home({ user, onLogout }) {
                             style={{
                                 padding: '10px 12px 10px 38px', 
                                 fontSize: '14px', 
-                                width: '100%', // Để input giãn hết khung chứa maxWidth
+                                width: '100%', 
                                 borderRadius: '8px',
                                 border: '1px solid #e0e0e0',
                                 background: '#f9fafb'
@@ -219,31 +220,17 @@ function Home({ user, onLogout }) {
                    </div>
                 </div>
 
-                {/* 3. BÊN PHẢI: Nút Tạo mới -> Rồi đến Thông báo */}
                 <div style={{display:'flex', alignItems:'center', gap:'15px', minWidth: '200px', justifyContent: 'flex-end'}}>
-                   
-                   {/* Nút Tạo Mới (Đưa lên trước) */}
                    <button 
                         className="btn-add" 
                         onClick={() => setIsAddingTask(true)} 
                         style={{
-                            padding: '10px 20px', 
-                            fontSize: '14px', 
-                            display:'flex', 
-                            alignItems:'center', 
-                            gap:'8px',
-                            background: '#0052cc',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: '600'
+                            padding: '10px 20px', fontSize: '14px', display:'flex', alignItems:'center', gap:'8px',
+                            background: '#0052cc', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
                         }}
                    >
                        <FaPlus /> Tạo mới
                    </button>
-
-                   {/* Chuông Thông Báo (Đưa xuống cuối) */}
                    <Notification user = {user} API_URL = {API_URL} />
                 </div>
             </header>
@@ -279,8 +266,12 @@ function Home({ user, onLogout }) {
         isOpen={!!deletingTask} onClose={() => setDeletingTask(null)} onConfirm={confirmDelete} task={deletingTask}
       />
 
-      <ChangePasswordModal
-        isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={fetchTasks}
+      <ProfileModal
+        isOpen={isChangePasswordOpen} 
+        onClose={() => setIsChangePasswordOpen(false)}
+        user={user}         
+        setUser={setUser} 
+        API_URL={API_URL}
       />
       <ChatWidget user={user} API_URL={API_URL} />
     </>

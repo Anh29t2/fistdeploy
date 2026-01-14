@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require("socket.io");
+const path = require('path');
 const authRouters = require('../routes/authRoutes.js');
 const taskRoutes = require('../routes/taskRoutes'); 
 const projectRouters = require('../routes/projectRoutes.js')
@@ -23,6 +24,7 @@ app.use(express.json());
 const connection = require('../config/db.js');
 const { use } = require('react');
 
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/tasks', taskRoutes);
 app.use('/api/auth',authRouters);
 app.use('/api/projects',projectRouters);
@@ -30,7 +32,6 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/statistics', statisticRoutes);
 app.use('/api/users', userRoutes);
-app.use('/uploads', express.static('uploads'));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -42,13 +43,13 @@ const io = new Server(server, {
 app.set('socketio', io);
 
 io.on('connection', (socket) => {
-    console.log('⚡ User connected:', socket.id);
+    console.log('User connected:', socket.id);
 
     socket.on('register_user', (userId) => {
         if (userId) {
             const roomName = String(userId); 
             socket.join(roomName);
-            console.log(`✅ User ${userId} đã join vào room: ${roomName}`);
+            console.log(`User ${userId} đã join vào room: ${roomName}`);
         }
     });
 
@@ -82,4 +83,5 @@ io.on('connection', (socket) => {
 
 server.listen(port, () => {
     console.log(`Server Socket đang chạy tại port ${port}`);
+    console.log(`Thư mục lưu trữ mở tại: ${path.join(__dirname , 'uploads')}`);
 });
