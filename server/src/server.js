@@ -10,6 +10,7 @@ const messageRoutes = require('../routes/messageRoutes.js');
 const notificationRoutes = require('../routes/notificationRoutes.js');
 const statisticRoutes = require('../routes/statisticRoutes.js');
 const userRoutes = require('../routes/userRoutes.js');
+const commentRoutes = require('../routes/commentRoutes.js');
 // Vẫn giữ import này để dùng cho Task, nhưng không dùng cho Message nữa
 const { createNotification } = require('../utils/notificationHelper.js');
 
@@ -32,6 +33,8 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/statistics', statisticRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/comments', commentRoutes);
+
 
 const server = http.createServer(app);
 const io = new Server(server, {
