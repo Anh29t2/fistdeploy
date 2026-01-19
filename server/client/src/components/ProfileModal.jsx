@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {toast} from 'react-toastify';
-import { FaUser, FaLock, FaCamera, FaSave, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaUser, FaLock, FaCamera, FaEye, FaEyeSlash } from "react-icons/fa";
 
 export default function ProfileModal ({ isOpen,onClose, user, setUser, API_URL }) {
     const [activeTab, setActiveTab] = useState('info');
@@ -140,7 +140,8 @@ return (
                     <button onClick={onClose} style={{border:'none', background:'none', fontSize:'24px', cursor:'pointer'}}>&times;</button>
                 </div>
 
-                <div style={{display: 'flex', minHeight: '400px'}}>
+                <div style={{display: 'flex', minHeight: '550px'}}>
+                    
                     {/* MENU TRÁI */}
                     <div style={{width: '160px', background: '#f4f5f7', borderRight: '1px solid #eee', paddingTop:'20px'}}>
                         <div onClick={() => setActiveTab('info')} style={menuStyle(activeTab === 'info')}>
@@ -152,15 +153,17 @@ return (
                     </div>
 
                     {/* NỘI DUNG PHẢI */}
-                    <div style={{flex: 1, padding: '30px'}}>
+                    <div style={{flex: 1, padding: '30px', display: 'flex', flexDirection: 'column'}}>
+                        
+                        {/* TAB 1: THÔNG TIN */}
                         {activeTab === 'info' && (
-                            <form onSubmit={handleUpdateInfo}>
+                            <form onSubmit={handleUpdateInfo} style={{flex: 1}}>
                                 <div style={{display:'flex', justifyContent:'center', marginBottom:'30px'}}>
-                                    <div style={{position:'relative', width:'100px', height:'100px'}}>
+                                    <div style={{position:'relative', width:'100px', height:'150px'}}>
                                         <img 
                                             src={previewUrl || "https://via.placeholder.com/100"} 
                                             alt="Avatar" 
-                                            style={{width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover', border:'4px solid #fff', boxShadow:'0 2px 10px rgba(0,0,0,0.1)'}}
+                                            style={{width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover'}}
                                         />
                                         <label htmlFor="avatar-upload" style={{position:'absolute', bottom:0, right:0, background:'#0052cc', color:'white', width:'32px', height:'32px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', border:'2px solid white'}}>
                                             <FaCamera size={14}/>
@@ -170,94 +173,51 @@ return (
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Họ và tên</label>
-                                    <input type="text" className="control-input" value={name} onChange={e => setName(e.target.value)} />
+                                    <label style={{display:'block', marginBottom:'8px', fontWeight:'500'}}>Họ và tên</label>
+                                    <input type="text" className="control-input" value={name} onChange={e => setName(e.target.value)} style={{width: '95%', padding: '10px'}} />
                                 </div>
-                                <div className="form-group" style={{marginTop:15}}>
-                                    <label>Email</label>
-                                    <input type="text" className="control-input" value={user?.email} disabled style={{background:'#f5f5f5'}} />
+                                <div className="form-group" style={{marginTop:20}}>
+                                    <label style={{display:'block', marginBottom:'8px', fontWeight:'500'}}>Email</label>
+                                    <input type="text" className="control-input" value={user?.email} disabled style={{background:'#f5f5f5', width: '95%', padding: '10px'}} />
                                 </div>
-                                <button type="submit" className="modal-btn modal-confirm" style={{marginTop: 20, width:'100%'}}>
-                                    <FaSave style={{marginRight:5}}/> Lưu thay đổi
+                                
+                                {/* [ĐÃ SỬA]: Nút Lưu không còn icon và chỉ còn chữ "Lưu" */}
+                                <button 
+                                    type="submit" 
+                                    // className="modal-btn modal-confirm" // Bỏ class cũ đi để tránh xung đột style
+                                    style={{
+                                        marginTop: 50,
+                                        width:'100%',
+                                        padding: '12px',
+                                        backgroundColor: '#0052cc', // Màu xanh chủ đạo
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontSize: '16px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        // Flexbox để căn giữa chữ Lưu hoàn hảo
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                     Lưu
                                 </button>
                             </form>
                         )}
 
+                        {/* TAB 2: MẬT KHẨU */}
                         {activeTab === 'password' && (
                             <form onSubmit={handleChangePassword} style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-    <h4 style={{marginTop:0, marginBottom:'30px', textAlign: 'center', fontSize: '18px'}}>Đổi mật khẩu</h4>
-    
-    {/* --- MẬT KHẨU CŨ --- */}
-    <div style={{marginBottom: '25px'}}>
-        <label style={{display:'block', marginBottom:'8px', fontWeight:'500'}}>Mật khẩu cũ</label>
-        <div style={{position: 'relative'}}>
-            <input 
-                className="control-input" 
-                type={showOldPass ? "text" : "password"} // Thay đổi kiểu nhập liệu
-                value={oldPassword} 
-                onChange={e=>setOldPassword(e.target.value)} 
-                style={{width:'90%', padding: '10px 40px 10px 10px'}} // Padding phải 40px để chữ không đè lên icon
-            />
-            <span 
-                onClick={() => setShowOldPass(!showOldPass)}
-                style={{
-                    position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', 
-                    cursor: 'pointer', color: '#666', fontSize: '16px', display: 'flex'
-                }}
-            >
-                {showOldPass ? <FaEyeSlash /> : <FaEye />}
-            </span>
-        </div>
-    </div>
-    
-    {/* --- MẬT KHẨU MỚI --- */}
-    <div style={{marginBottom: '25px'}}>
-        <label style={{display:'block', marginBottom:'8px', fontWeight:'500'}}>Mật khẩu mới</label>
-        <div style={{position: 'relative'}}>
-            <input 
-                className="control-input" 
-                type={showNewPass ? "text" : "password"} 
-                value={newPassword} 
-                onChange={e=>setNewPassword(e.target.value)} 
-                style={{width:'90%', padding: '10px 40px 10px 10px'}} 
-            />
-            <span 
-                onClick={() => setShowNewPass(!showNewPass)}
-                style={{
-                    position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', 
-                    cursor: 'pointer', color: '#666', fontSize: '16px', display: 'flex'
-                }}
-            >
-                {showNewPass ? <FaEyeSlash /> : <FaEye />}
-            </span>
-        </div>
-    </div>
-    
-    {/* --- XÁC NHẬN MẬT KHẨU --- */}
-                <div style={{marginBottom: '35px'}}>
-                    <label style={{display:'block', marginBottom:'8px', fontWeight:'500'}}>Xác nhận mật khẩu mới</label>
-                    <div style={{position: 'relative'}}>
-                        <input 
-                            className="control-input" 
-                            type={showConfirmPass ? "text" : "password"} 
-                            value={confirmPassword} 
-                            onChange={e=>setConfirmPassword(e.target.value)} 
-                            style={{width:'90%', padding: '10px 40px 10px 10px'}} 
-                        />
-                        <span 
-                            onClick={() => setShowConfirmPass(!showConfirmPass)}
-                            style={{
-                                position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', 
-                                cursor: 'pointer', color: '#666', fontSize: '16px', display: 'flex'
-                            }}
-                        >
-                            {showConfirmPass ? <FaEyeSlash /> : <FaEye />}
-                        </span>
-                    </div>
-                </div>
-                
-                <button type="submit" className="modal-btn modal-delete-confirm" style={{width:'100%', padding: '12px', marginTop: 'auto'}}>Xác nhận đổi</button>
-            </form>
+                                <h4 style={{marginTop:0, marginBottom:'30px', textAlign: 'center', fontSize: '18px'}}>Đổi mật khẩu</h4>
+                                
+                                {renderPasswordInput("Mật khẩu cũ", oldPassword, setOldPassword, showOldPass, setShowOldPass, "Nhập mật khẩu hiện tại")}
+                                {renderPasswordInput("Mật khẩu mới", newPassword, setNewPassword, showNewPass, setShowNewPass, "Nhập mật khẩu mới")}
+                                {renderPasswordInput("Xác nhận mật khẩu mới", confirmPassword, setConfirmPassword, showConfirmPass, setShowConfirmPass, "Nhập lại mật khẩu mới")}
+                                
+                                <button type="submit" className="modal-btn modal-delete-confirm" style={{width:'100%', padding: '12px', marginTop: 'auto'}}>Xác nhận đổi</button>
+                            </form>
                         )}
                     </div>
                 </div>
@@ -271,5 +231,6 @@ const menuStyle = (isActive) => ({
     background: isActive ? 'white' : 'transparent',
     color: isActive ? '#0052cc' : '#42526e',
     fontWeight: isActive ? 'bold' : 'normal',
-    borderLeft: isActive ? '3px solid #0052cc' : '3px solid transparent'
+    borderLeft: isActive ? '3px solid #0052cc' : '3px solid transparent',
+    transition: '0.2s'
 });
