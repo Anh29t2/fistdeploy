@@ -8,12 +8,13 @@ import EditTaskModal from '../components/EditTaskModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import MembersModal from '../components/MembersModal';
 import ChatWidget from '../components/ChatWidget';
-import ChangePasswordModal from '../components/ChangePasswordModal';
+// import ChangePasswordModal from '../components/ChangePasswordModal';
+import ProfileModal from '../components/ProfileModal';
 import Notification from '../components/Notification';
 import { FaHome, FaProjectDiagram, FaSignOutAlt, FaSearch, FaPlus, FaClock, FaUsers, FaKey, FaCheckCircle, FaHourglassHalf, FaFire } from "react-icons/fa";
 import SideBar from '../components/SideBar';
 
-export default function ProjectDetail({ user, onLogout }) {
+export default function ProjectDetail({ user, onLogout, setUser }) {
   const { projectId } = useParams();
   const navigate = useNavigate();
   
@@ -214,6 +215,7 @@ export default function ProjectDetail({ user, onLogout }) {
             activePage="projects" 
             onLogout={onLogout} 
             onChangePassword={() => setIsChangePasswordOpen(true)}
+            user = {user}
         />
 
         <main className="main-content" style={{paddingRight: '20px'}}> 
@@ -269,8 +271,8 @@ export default function ProjectDetail({ user, onLogout }) {
             )}
         </main>
       </div>
-
-      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} />
+      {/* <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} /> */}
+      <ProfileModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} user={user} setUser={setUser} API_URL={API_URL} />
       <ChatWidget user={user} projectId={projectId} API_URL={API_URL} />
       <AddTaskModal isOpen={isAddingTask} onClose={() => setIsAddingTask(false)}
                     onSubmit={handleAddTask} title={newTaskTitle} setTitle={setNewTaskTitle}

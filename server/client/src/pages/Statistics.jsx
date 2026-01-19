@@ -9,11 +9,12 @@ import {
 } from "react-icons/fa";
 
 // Import các component chung
-import ChangePasswordModal from "../components/ChangePasswordModal";
+// import ChangePasswordModal from "../components/ChangePasswordModal";
+import ProfileModal from '../components/ProfileModal';
 import Notification from '../components/Notification';
 import SideBar from '../components/SideBar'; // Nhớ import Sidebar mới
 
-export default function Statistics({ user, onLogout }) {
+export default function Statistics({ user, onLogout, setUser }) {
     const navigate = useNavigate();
     const [stats, setStats] = useState(null);
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -37,6 +38,8 @@ export default function Statistics({ user, onLogout }) {
                 } else {
                     console.error("Lỗi tải thống kê:", response.status);
                     toast.error("Không tải được dữ liệu thống kê");
+                    onLogout();
+                    return null;
                 }
             } catch (error) {
                 console.error("Lỗi mạng:", error);
@@ -64,6 +67,7 @@ export default function Statistics({ user, onLogout }) {
                     activePage="statistics" 
                     onLogout={onLogout} 
                     onChangePassword={() => setIsChangePasswordOpen(true)} 
+                    user = {user}
                 />
 
                 <main className="main-content">
@@ -178,11 +182,8 @@ export default function Statistics({ user, onLogout }) {
                     </div>
                 </main>
             </div>
-
-            {/* --- MODALS & WIDGETS --- */}
-            <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} />
-            
-            {/* Bạn có thể bỏ ChatWidget ở trang này nếu muốn nó đỡ rối */}
+            {/* <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} /> */}
+            <ProfileModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} user={user} setUser={setUser} API_URL={API_URL} />
         </>
     );
 }

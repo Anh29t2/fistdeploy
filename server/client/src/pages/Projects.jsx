@@ -5,13 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import ProjectCard from '../components/ProjectCard';
 import AddProjectModal from '../components/AddProjectModal';
 import ChatWidget from '../components/ChatWidget';
-import ChangePasswordModal from "../components/ChangePasswordModal";
+// import ChangePasswordModal from "../components/ChangePasswordModal";
+import ProfileModal from '../components/ProfileModal';
 import Notification from '../components/Notification';
 import SideBar from '../components/SideBar';
 
 import { FaHome, FaProjectDiagram, FaKey, FaSignOutAlt, FaSearch, FaPlus } from "react-icons/fa";
 
-export default function Projects({ user, onLogout }) {
+export default function Projects({ user, onLogout, setUser }) {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [isAddingProject, setIsAddingProject] = useState(false);
@@ -35,7 +36,6 @@ export default function Projects({ user, onLogout }) {
     try {
       const response = await fetch(url, { ...options, headers });
       if (response.status === 401) {
-        // Bỏ 403 ủy quyền
         toast.error("Hết phiên đăng nhập!", { toastId: 'session-expired' });
         onLogout(); 
         return null;
@@ -114,6 +114,7 @@ export default function Projects({ user, onLogout }) {
             activePage="projects" 
             onLogout={onLogout} 
             onChangePassword={() => setIsChangePasswordOpen(true)}
+            user = {user}
         />
 
         <main className="main-content" style={{paddingRight: '20px'}}>
@@ -178,7 +179,8 @@ export default function Projects({ user, onLogout }) {
       
       </div>
       
-      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} />
+      {/* <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} onSuccess={() => {}} /> */}
+      <ProfileModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} user={user} setUser={setUser} API_URL={API_URL} />
       <ChatWidget user={user} API_URL={API_URL} />
       <AddProjectModal isOpen={isAddingProject} onClose={() => setIsAddingProject(false)} onSubmit={handleAddProject} name={newProjectName} setName={setNewProjectName} description={newProjectDescription} setDescription={setNewProjectDescription} deadline={newProjectDeadline} setDeadline={setNewProjectDeadline} />
       
